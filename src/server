@@ -1,0 +1,63 @@
+#!/usr/bin/perl -T
+
+use strict;
+use warnings;
+use IO::Socket::IP;
+use Socket qw( inet_ntop );
+use IO::Socket::UNIX qw( SOCK_STREAM SOMAXCONN SO_PEERCRED );
+use IO::Select;
+use Data::Dumper;
+
+sub auth_handler($) {
+    my $server = shift;
+    my $sock = $server->accept() or warn "$!";
+    my ($pid, $uid, $gid) = unpack('lll', $sock->sockopt(SO_PEERCRED));
+    my $request = $sock->getline() or warn "$!";
+
+    print "AUTH PID:\t$pid\n";
+    print "AUTH UID:\t$uid\n";
+    print "AUTH GID:\t$gid\n";
+    print "AUTH DATA:\t$request\n";
+
+    $sock->print("DENIED\n") or warn "$!";
+    $sock->close() or warn "$!";
+}
+
+sub syncronization_handler($) {
+    my $sock = shift;
+    my $data;
+    my $peer_sa = $sock->recv($data, 512, 0);
+    my ($port, $ip6a, $scope_id, $flowinfo) = unpack_sockaddr_in6($peer_sa);
+    my $ip = inet_ntop(AF_INET6, $ip6a);
+
+    print "SYNC PEER:\t$ip $port\n";
+    print "SYNC DATA:\t$data\n";
+}
+
+my $auth_sock = IO::Socket::UNIX->new(
+    Type       => SOCK_STREAM,
+    Local      => '/tmp/catsock',
+    Listen     => SOMAXCONN,
+) or die $!;
+
+my $syncronization_sock = IO::Socket::IP->new(
+    LocalService => 16000,
+    LocalHost    => '::',
+    Proto        => 'udp',
+    Reuse        => 1,
+) or die $!;
+
+my $select = IO::Select->new($auth_sock, $syncronization_sock)
+    or die $!;
+
+while(my @ready = $select->can_read()) {
+    foreach my $fh (@ready) {
+        if ($fh == $auth_sock) {
+            auth_handler($fh);
+        } elsif ($fh == $syncronization_sock) {
+            syncronization_handler($fh);
+        } else {
+            print STDERR "Unhandled socket $fh\n";
+        }
+    }
+}

@@ -1,0 +1,13 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+use IO::Socket::IP;
+
+my $sock = IO::Socket::IP->new(
+    PeerHost    => '::1',
+    PeerService => 16000,
+    Proto       => 'udp',
+) or die $!;
+
+$sock->send("jdslfjdslfjdslfjdlskjfldsjflksdjfds\n") or warn "$!";

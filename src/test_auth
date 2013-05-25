@@ -1,0 +1,19 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+use IO::Socket::UNIX qw( SOCK_STREAM );
+
+my $sock_path = shift @ARGV;
+
+die "$sock_path is not a socket\n" unless -S $sock_path;
+
+my $sock = IO::Socket::UNIX->new($sock_path)
+    or die $!;
+
+my $input = shift @ARGV;
+my $data;
+
+$sock->print("$input\n");
+
+print $sock->getline();
