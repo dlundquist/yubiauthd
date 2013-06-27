@@ -1,5 +1,5 @@
 
-Interfaces
+Interfaces:
 
 UNIX socket
     local authentication requests
@@ -9,16 +9,24 @@ UNIX socket
         Response:
 
 UDP Socket for counter synchronization
+    Protocol:
+        Notification:
+            public_id
+            counter
+            hmac
+
 
 Peers:
     ip_address
     shared_secret
 
 Identities:
-    public_prefix       CHAR(12)
-    physical_key_number
+    public_id           CHAR(12)
+    serial_number
+    uid #private_id
     username
-    private_id
-    AES_key
+    aes_key
     counter
     last_valid_key
+
+
