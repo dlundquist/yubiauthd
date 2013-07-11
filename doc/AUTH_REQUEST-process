@@ -1,0 +1,10 @@
+
+
+Incoming Connection on authentication socket
+    client_sock = auth_sock.accept()
+Authentication challenge written to authentication client socket
+    client_sock.read()
+Do we have a complete authentication challenge?
+
+
+

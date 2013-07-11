@@ -1,0 +1,226 @@
+#!/usr/bin/perl -T
+#
+# This script is called by SSH when users log into the box.  Its job
+# is to check the connecting IP of the connecting user, and if we've never
+# seen that user connect over the given IP, to force a second factor for
+# authentication.  At the present time, that second factor is yubikeys--
+# and this requires a secondary script to be run with root privileges
+# (so that it has the ability to read privileged data to decrypt said keys).
+#
+# Note that in order for this script to be meaningful, a cron job should
+# also be created to periodically remove those "seen IPs" from the list
+# (say, after 12 hours) so the user has to reauthenticate the IP, eh.
+#
+# Obviously, since a failure in this script means nobody can log in over
+# SSH, it's important this thing react well in a partial failure
+# scenario, eh.
+#
+# For this command to be use, the sshd_config should be updated with a line
+# like the following:
+#
+#  ForceCommand /usr/local/bin/bbg-ip-check
+
+# Before anything else, we want to prevent any funny business around signals being
+# used to background or terminate this process unexpectedly.
+$SIG{TERM} = 'IGNORE';
+$SIG{INT} = sub { kill SIGKILL, $$; };
+$SIG{HUP} = 'IGNORE';
+$SIG{TSTP} = 'IGNORE';
+
+# Signal handler for alarm conditions...
+local $SIG{ALRM} = sub {
+    do_timeout();
+};
+
+use strict;
+use Sys::Syslog;
+use Data::Dumper;
+
+use constant {
+    IPDIR => '/var/yubiauth/ips',
+    AUTHTIMEOUT => 60,
+    AUTHATTEMPTS => 3,
+    YUBIAUTH => '/usr/local/bin/yubiauth',
+    SUDO => '/usr/bin/sudo'
+};
+
+# Global variables
+my $user;
+my $ip;
+
+# Accounts for which we'll skip 2 factor auth
+my $skipped = {
+    'root' => 1,
+};
+
+sub check_environment() {
+    # Start our syslog...
+    openlog("bbg-ip-auth", "nofatal", 'authpriv');
+
+    # Set the PATH to something safe so we can exec() in taint mode
+    $ENV{'PATH'} = "/usr/bin:/bin";
+}
+
+# Checks to see whether this user and IP have authed before.  Returns true if so.
+sub ip_is_authed($$) {
+    my $ip = shift;
+    my $user = shift;
+
+    # Replace colons in IPv6 addresses with dashes.
+    $ip =~ s/:/-/g;
+
+    if ( -e IPDIR . "/$user-$ip") {
+        return 1;
+    }
+    return undef;
+}
+
+# This returns true if our account is on our "skipped" list for 2 factor auth.
+sub skipped_account($) {
+    my $user = shift;
+    return defined($skipped->{$user});
+}
+
+# This actually authenticates an unknown IP / user
+sub auth_ip_user($$) {
+    my $ip = shift;
+    my $user = shift;
+    my $code;
+
+    # Don't wait for that code indefinitely
+    alarm AUTHTIMEOUT;
+
+    print "Press yubikey for 3 seconds: ";
+    $code = <STDIN>;
+    chomp($code);
+
+    # Turn off that alarm
+    alarm 0;
+
+    return undef if ("" eq $code);
+
+    # Make taint checking happy...
+    if ($code =~ /^(.+)$/) {
+        $code = $1;
+    }
+
+    system(SUDO, YUBIAUTH, $code, $user);
+    my $retval = $? >> 8;
+
+    if (0 == $retval) {
+        syslog('info', "$user : $ip : Successful IP authentication");
+        # Cache the successful auth...
+
+        # Replace colons in IPv6 addresses with dashes.
+        $ip =~ s/:/-/g;
+
+        # This is the equivalent of a "touch" command without having to spawn a new process.
+        open(AUTH,">" . IPDIR . "/$user-$ip") || syslog('warning', "$user : $ip : Unable to cache yubi auth: $!");
+        close(AUTH);
+        return 1;
+    }
+
+    # If we are here, we didn't auth successfully.
+    return undef;
+}
+
+# This is what we do if there's a timeout authenticating...
+sub do_timeout {
+    syslog('warning', "$user: $ip : Timed out while waiting for yubi code");
+    exit 3;
+}
+
+# This just extracts the client IP address from the SSH_CONNECTION environment variable.
+sub get_ip {
+    my $remote_addr;
+    my $remote_port;
+    my $server_addr;
+    my $server_port;
+
+    if (defined $ENV{'SSH_CONNECTION'} and $ENV{'SSH_CONNECTION'} =~
+        m/^([:\.\da-f]{2,39})\s+(\d{2,5})\s+([:\.\da-f]{2,39})\s+(\d{2,5})$/i) {
+        $remote_addr = $1;
+        $remote_port = $2;
+        $server_addr = $3;
+        $server_port = $4;
+        return $remote_addr;
+    }
+    return undef;
+}
+
+# Prints the motd without having to spawn an external process.
+sub print_motd {
+    open (MOTD, "</etc/motd") || syslog('warning', "Could not print /etc/motd: $!");
+    while (<MOTD>) {
+        print;
+    }
+    close(MOTD);
+}
+
+# This takes care of "doing the right thing" after a successful authentication
+sub post_auth {
+    my $cmd = $ENV{'SSH_ORIGINAL_COMMAND'};
+
+    my $shell;
+    # Make taint checking happy...
+    if ($ENV{'SHELL'} =~ /^([\w\/]+)$/) {
+        $shell = $1;
+    }
+
+    # Do we even have a command to run?
+    unless (defined($cmd)) {
+        print_motd();
+        closelog();
+        exec($shell,"-l");
+    }
+
+    # Make taint checking happy.  Blindly accept any commands the user typed.
+    if ($cmd =~ /^(.+)$/) {
+        $cmd = $1;
+    }
+
+    exec($shell,"-c",$cmd);
+}
+
+sub main {
+    check_environment();
+    $user = `/usr/bin/whoami`;
+    chomp($user);
+
+    # Make taint mode happy
+    if ($user =~ /^(.+)$/) {
+        $user = $1;
+    }
+
+    unless ($ip = get_ip()) {
+        system('error', $user . ": Unable to parse connecting IP");
+        exit 2;
+    }
+
+    # Skipping auth for this user?
+    if (skipped_account($user)) {
+        syslog('info', "$user : $ip : IP authentication skipped");
+        closelog();
+        post_auth();
+    }
+
+    # Are we already authed?
+    if (ip_is_authed($ip,$user)) {
+        syslog('info', "$user : $ip : Cached IP authentication found");
+        closelog();
+        post_auth();
+    }
+
+    # If we are here, we need to auth...
+    for (my $i = 0; $i < AUTHATTEMPTS ; $i++) {
+        post_auth() if (auth_ip_user($ip,$user));
+    }
+
+    # If we are here, we didn't successfully auth.
+    syslog('warning', "$user : $ip : Too many failed yubikey authentication attempts");
+    exit 1;
+}
+
+
+main();
+# vim: ai si ts=4 sw=4 et

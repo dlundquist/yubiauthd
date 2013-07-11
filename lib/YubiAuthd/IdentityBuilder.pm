@@ -36,6 +36,7 @@ sub new() {
         aes_key         => undef,
         uid             => undef,
         counter         => undef,
+        subscribers     => undef,
     };
 
     bless $self, $class;
@@ -51,7 +52,8 @@ sub build($) {
         $self->{username},
         $self->{aes_key},
         $self->{uid},
-        $self->{counter}
+        $self->{counter},
+        $self->{subscribers}
     );
 }
 
@@ -99,6 +101,14 @@ sub counter($$) {
     my ($self, $counter) = @_;
 
     $self->{counter} = $counter;
+
+    return $self;
+}
+
+sub subscribers($$) {
+    my ($self, $subscribers) = @_;
+
+    $self->{subscribers} = $subscribers;
 
     return $self;
 }

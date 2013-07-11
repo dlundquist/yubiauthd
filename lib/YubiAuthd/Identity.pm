@@ -26,19 +26,24 @@ our @EXPORT = qw( );
 
 our $VERSION = '0.01';
 
-sub new($$$$$$$) {
+sub new($$$$$$$$) {
     my ($class,
         $public_id,
         $serial_number,
         $username,
         $aes_key,
         $uid,
-        $counter) = @_;
+        $counter,
+        $subscribers) = @_;
 
     carp("$class->new(): invalid public_id") unless $public_id =~ /\A[cbdefghijklnrtuv]{12}\Z/;
     carp("$class->new(): invalid username") unless $username =~ /\A[a-z_][a-z0-9_-]{0,30}\Z/;
     carp("$class->new(): invalid aes_key") unless length($aes_key) == 32;
     carp("$class->new(): invalid counter") unless $counter eq int($counter) + 0;
+    carp("$class->new(): invalid subscribers") unless ref($subscribers) eq 'ARRAY';
+    foreach my $subscriber (@{$subscribers}) {
+        carp("$class->new(): subscriber $subscriber does not respond to notify()") unless $subscriber->can('notify');
+    }
 
     my $self = {
         public_id       => $public_id,
@@ -47,6 +52,7 @@ sub new($$$$$$$) {
         aes_key         => $aes_key,
         uid             => $uid,
         counter         => int($counter),
+        subscribers     => $subscribers,
     };
 
     bless $self, $class;
@@ -83,11 +89,21 @@ sub counter {
     my $counter = shift;
 
     if (defined $counter) {
-        croak(ref($self) . "->counter(): attempting to decrease counter") if (defined $self->{counter} && $counter < $self->{counter});
+        my $incremented = $counter > $self->{counter} ? 1 : undef;
+        croak(ref($self) . "->counter(): attempting to decrease counter") if $counter < $self->{counter};
         $self->{counter} = $counter;
+        $self->_notify_subscribers() if $incremented;
     }
 
     return $self->{'counter'};
+}
+
+sub _notify_subscribers($) {
+    my ($self) = $@;
+
+    foreach my $subscriber (@{$self->{subscribers}}) {
+        $subscriber->notify($self);
+    }
 }
 
 1;

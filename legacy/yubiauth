@@ -1,0 +1,274 @@
+#!/usr/bin/perl -T
+# This script performs user authentication based on a yubikey one time password
+# supplied via the command line.  To actually authenticate a user, the username
+# must be supplied as an optional second argument on the command line.  (If the
+# username is not supplied then all this script does is see if we recognize the
+# given key, and if so, decode the counter and session values and update local
+# files on the same.  It will refuse to authenticate in this scenario.  In
+# this way, if you've accidentally printed codes you didn't mean to somewhere,
+# you can supply a OTP to the script and invalidate all previous codes...
+#
+# This script will also attempt to update the other yama server with the latest
+# counter and session values for the authenticated OTP, so that said OTP cannot
+# be used on the other host.
+
+# Before anything else, we want to prevent any funny business around signals being
+# used to background or terminate this process unexpectedly.
+$SIG{TERM} = 'IGNORE';
+$SIG{INT} = 'IGNORE';
+$SIG{HUP} = 'IGNORE';
+$SIG{TSTP} = 'IGNORE';
+
+use strict;
+use Auth::Yubikey_Decrypter;
+use POSIX;
+use Sys::Syslog;
+
+use constant {
+    KEYDIR => '/var/yubiauth/keys',
+    USERDIR => '/var/yubiauth/users',
+    STATEDIR => '/var/yubiauth/state',
+    SSH => '/usr/bin/ssh',
+    SSHTIMEOUT => 5
+};
+
+# Global variables
+my $childpid;
+
+# Signal handler for alarm conditions...
+local $SIG{ALRM} = sub {
+    do_timeout();
+};
+
+# Print usage information and exit
+sub usage() {
+    print "Usage: sudo $0 <key> [username]\n";
+    exit 1;
+}
+
+# This gives us the name of the user who called this script
+sub sudo_user() {
+    my $user = 'unknown';
+    if (defined($ENV{'SUDO_USER'})) {
+        $user = $ENV{'SUDO_USER'};
+    }
+    return $user;
+}
+
+# Generic function to use if auth fails...
+sub authfail() {
+    sleep 3;
+    syslog('warning', sudo_user() . ": Yubikey authentication failure");
+    closelog();
+    exit 2;
+}
+
+# This exits with a supplied error message if there's some other kind of error (eg. invalid
+# yubicode, unknown public ID, unknown user (if supplied), or invalid key for user.
+sub bad_end($) {
+    my $msg = shift;
+
+    sleep 3;
+    syslog('warning', sudo_user() . ": $msg");
+    closelog();
+    print "$msg\n";
+    exit 3;
+}
+
+sub check_environment() {
+
+    # Start our syslog...
+    openlog("yubiauth", "nofatal", 'authpriv');
+
+    # Set the PATH to something safe so we can exec() in taint mode
+    $ENV{'PATH'} = "/usr/bin:/bin";
+
+    # Make sure we're root
+    usage() unless (0 == getuid());
+}
+
+# Just removes spaces from a string, eh.
+sub remove_spaces($) {
+    my $line = shift;
+    $line =~ s/\s+//g;
+    return $line;
+}
+
+# Loads our key decryption data based on the public key ID supplied
+sub load_by_publicid ($) {
+    my $id = shift;
+    my $privateid;
+    my $aeskey;
+    my $laststate = 0;   # Set to zero in the case where a state file does not yet exist for this key
+
+    if ( -f KEYDIR . "/$id") {
+        open(KEY, "<" . KEYDIR . "/$id") || die "Could not open " . KEYDIR . "/$id: $!\n";
+        $privateid = <KEY>;
+        $aeskey = <KEY>;
+        close(KEY);
+        chomp($privateid);
+        $privateid = remove_spaces($privateid);
+        chomp($aeskey);
+        $aeskey = remove_spaces($aeskey);
+        if ( -f STATEDIR . "/$id") {
+            open(STATE, "<" . STATEDIR . "/$id") || die "Could not open " . STATEDIR . "/$id: $!\n";
+            $laststate = <STATE>;
+            close(STATE);
+            chomp($laststate);
+        }
+        return ($privateid,$aeskey,$laststate);
+    } else {
+        return undef;
+    }
+}
+
+# Loads a given user's yubikey public ID.
+sub username_to_public_id($) {
+    my $username = shift;
+
+    if ( -e USERDIR . "/$username") {
+        open (USER, "<" . USERDIR . "/$username") || return undef;
+        my $publicid = <USER>;
+        close(USER);
+        chomp($publicid);
+        return $publicid;
+    } else {
+        return undef;
+    }
+}
+
+# This function returns true if the supplied string is modhex and is exactly the right length to be
+# a yubikey OTP.  Note that this string may contain a trailing \n.
+sub is_yubicode($) {
+    my $line = shift;
+    chomp($line);
+    return ((44 == length($line)) && ($line =~ /^[cbdefghijklnrtuv]+$/));
+}
+
+# This function gives the public ID of a modhex yubikey code
+sub yubi_publicid($) {
+    my $line = shift;
+    if (is_yubicode($line)) {
+        # Taint checking is stupid; We've already checked this, and this line is just make taint checking happy.
+        if ($line =~ m/^([cbdefghijklnrtuv]+)$/ ) {
+            $line = $1;
+        }
+        return substr $line, 0, 12;
+    } else {
+        return undef;
+    }
+}
+
+# This is the function which actually auths a OTP given the decryption data supplied...
+# Returns the new state of the key on success.  Returns undef if there's a failure to
+# auth.
+sub auth_otp($$$$) {
+    my $code = shift;
+    my $privateid = shift;
+    my $aeskey = shift;
+    my $laststate = shift;
+
+    my ($ykpid,$yksid,$ykcounter,$yktimestamp,$yksession,$ykrand,$ykcrcdec,$ykcrcok) = Auth::Yubikey_Decrypter::yubikey_decrypt($code,$aeskey);
+    my $newstate = ($ykcounter * 1000) + $yksession;
+    return undef unless ((1 == $ykcrcok) && ($privateid == $yksid) && ($newstate > $laststate));
+
+    # If we're here, we authed OK.  Update our state file...
+    my $publicid = yubi_publicid($code);
+    open(STATE, ">" . STATEDIR . "/$publicid") || die "Could not open " . STATEDIR . "/$publicid: $!\n";
+    print STATE $newstate;
+    close(STATE);
+
+    # Log the successful key authentication
+    syslog('info', sudo_user() . ": Yubikey $ykpid state incremented");
+
+    return $newstate;
+}
+
+# Function to update peer with latest successful auth state for this yubikey.
+sub update_peer($$) {
+    my $publicid = shift;
+    my $newstate = shift;
+
+    my $sshcmd = "echo $newstate > " . STATEDIR . "/$publicid";
+
+    # We need to fork here to make sure we can handle timeouts OK.
+    $childpid = fork();
+
+    unless (defined $childpid) {
+        syslog('warning', sudo_user() . ": Unable to spawn child to update other yama");
+        return undef;
+    } elsif (0 == $childpid) {
+        # Child
+
+        # Some local signal handling... just in case we need to kill that SSH session...
+        $SIG{TERM} = 'DEFAULT';
+
+        system(SSH, "otheryama", $sshcmd);
+
+        # Check our return value and log any problems...
+        my $retval = $? >> 8;
+        syslog('warning', sudo_user() . ": Unable to increment state on other yama") unless (0 == $retval);
+
+    } else {
+        # Parent
+        # Make sure we don't wait forever on the other yama...
+        alarm SSHTIMEOUT;
+
+        waitpid($childpid,0);
+    }
+}
+
+# This function handles SSH timeouts (that's the only possible timeout in this script...)
+sub do_timeout() {
+    syslog('warning', sudo_user() . ": Timeout while trying to update state on other yama");
+    kill SIGTERM, $childpid if ($childpid);
+}
+
+# Function to use when we succeed in authing, eh.
+sub authsuccess() {
+    syslog('info', sudo_user() . ": Yubikey authentication success");
+    closelog();
+    exit 0;
+}
+
+# This handles the rest of the main() loop after attempting to update the peer
+sub after_peer() {
+}
+
+sub main() {
+    check_environment();
+    usage() if ($#ARGV == -1);
+
+    my $code = $ARGV[0];
+    my $user = $ARGV[1];
+
+    my $public_id = yubi_publicid($code);
+
+    bad_end("Invalid yubi code") unless ($public_id);
+
+    my ($privateid,$aeskey,$laststate) = load_by_publicid($public_id);
+
+    bad_end("Unable to find decryption data for key $public_id") unless ($privateid);
+
+    my $newstate = auth_otp($code,$privateid,$aeskey,$laststate);
+    authfail() unless ($newstate);
+
+    # The code we saw was good, regardless of which user it corresponds with.  Update our peer...
+    update_peer($public_id,$newstate);
+
+    # If we don't have a user defined here, this is where we leave.  No point in sleeping, though.
+    exit 4 unless ($user);
+
+    # Taint check our username...
+    bad_end("Invalid username") unless ($user =~ /^[\w]+$/);
+
+    # If we do have a user, let's make sure our user corresponds with the key we just saw...
+    my $userid = username_to_public_id($user);
+    authfail() unless ($userid eq $public_id);
+
+    # If we're here, we've successfully authed.
+    authsuccess();
+}
+
+main();
+# vim: ai si ts=4 sw=4 et

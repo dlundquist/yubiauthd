@@ -42,4 +42,17 @@ sub find_by_serial_number {
     die "This method must be overridden by a subclass of __PACKAGE__";
 }
 
+sub subscribe($$) {
+    my ($self, $subscriber) = $@;
+
+    $self->{subscribers} ||= [];
+    push(@{$self->{subscribers}}, $subscriber);
+}
+
+sub subscribers($) {
+    my ($self) = $@;
+
+    return $self->{subscribers};
+}
+
 1;
