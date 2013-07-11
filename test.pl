@@ -19,8 +19,10 @@ print Dumper $user;
 use EV;
 use AnyEvent;
 use YubiAuthd::AuthenticationSocket;
+use YubiAuthd::SynchronizationSocket;
 
 my $auth_socket = YubiAuthd::AuthenticationSocket->new("/tmp/yubiauth.sock");
+my $sync_socket = YubiAuthd::SynchronizationSocket->new('::', 16000);
 
 # Run our event loop
 AnyEvent->condvar->recv;

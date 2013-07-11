@@ -35,34 +35,34 @@ sub new($$) {
 
     unlink $socket_path if -S $socket_path;
     my $socket = IO::Socket::UNIX->new(
-        Type       => SOCK_STREAM,
-        Local      => $socket_path,
-        Listen     => SOMAXCONN,
-        Blocking   => 0,
+        Type        => SOCK_STREAM,
+        Local       => $socket_path,
+        Listen      => SOMAXCONN,
+        Blocking    => 0,
     ) or carp("$class->new(): invalid socket");
 
     my $self = {
-        socket => $socket,
+        socket      => $socket,
         socket_path => $socket_path,
+        watcher     => undef,
     };
 
     bless $self, $class;
 
-    $self->{w} = AnyEvent->io(
+    $self->{watcher} = AnyEvent->io(
         fh         => $self->{socket},
         poll       => 'r',
-        cb         => sub { $self->read_cb(); }
+        cb         => sub { $self->_read_cb(); }
     );
 
     return $self;
 }
 
-sub read_cb($) {
+sub _read_cb($) {
     my ($self) = @_;
 
     my $sock = $self->{socket}->accept() or carp("read_cb: $!");
     my ($pid, $uid, $gid) = unpack('lll', $sock->sockopt(SO_PEERCRED));
-    print "accept connection form $sock\n";
 
     return YubiAuthd::AuthenticationSession->new($sock, $pid, $uid, $gid);
 }

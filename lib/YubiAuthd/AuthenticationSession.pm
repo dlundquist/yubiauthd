@@ -6,6 +6,7 @@ use warnings;
 
 require Exporter;
 use Carp;
+use Data::Dumper;
 require AnyEvent;
 
 our @ISA = qw(Exporter);
@@ -31,34 +32,36 @@ sub new($$) {
     my ($class, $socket, $pid, $uid, $gid) = @_;
 
     my $self = {
-        socket => $socket,
-        pid => $pid,
-        uid => $uid,
-        gid => $gid,
+        socket  => $socket,
+        pid     => $pid,
+        uid     => $uid,
+        gid     => $gid,
+        watcher => undef,
     };
 
     bless $self, $class;
 
-    $self->{w} = AnyEvent->io(
+    $self->{watcher} = AnyEvent->io(
         fh         => $self->{socket},
         poll       => 'r',
-        cb         => sub { $self->read_cb(); }
+        cb         => sub { $self->_read_cb(); },
     );
 
     return $self;
 }
 
-sub read_cb($) {
+sub _read_cb($) {
     my ($self) = @_;
 
     my $msg = undef;
     $self->{socket}->recv($msg, 256, 0);
 
     if ($msg) {
-        print "receive $msg from $self->{uid}\n";
+        print "message from " . Dumper($self) . ":\n$msg";
+        $self->{socket}->send("DENIED\n");
     } else {
         $self->{socket}->shutdown(2);
-        $self->{w} = undef;
+        $self->{watcher} = undef;
     }
 }
 
