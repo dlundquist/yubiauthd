@@ -29,9 +29,12 @@ our @EXPORT = qw( );
 
 our $VERSION = '0.01';
 
-sub new($$) {
+sub new($%) {
     my ($class,
-        $socket_path) = @_;
+        %params) = @_;
+
+    my $socket_path = $params{socket_path};
+    my $identity_store = $params{identity_store};
 
     unlink $socket_path if -S $socket_path;
     my $socket = IO::Socket::UNIX->new(
@@ -50,9 +53,9 @@ sub new($$) {
     bless $self, $class;
 
     $self->{watcher} = AnyEvent->io(
-        fh         => $self->{socket},
-        poll       => 'r',
-        cb         => sub { $self->_read_cb(); }
+        fh          => $self->{socket},
+        poll        => 'r',
+        cb          => sub { $self->_read_cb(); }
     );
 
     return $self;

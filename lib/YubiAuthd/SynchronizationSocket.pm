@@ -9,6 +9,7 @@ use Carp;
 require IO::Socket::IP;
 require Socket;
 require AnyEvent;
+require YubiAuthd::IdentityStore;
 
 
 our @ISA = qw(Exporter);
@@ -30,30 +31,43 @@ our @EXPORT = qw( );
 
 our $VERSION = '0.01';
 
-sub new($$$) {
+sub new($%) {
     my ($class,
-        $ip,
-        $port) = @_;
+        %params) = @_;
+
+    my $ip          = $params{ip_address};
+    my $port        = $params{port};
+    my $id_store    = $params{identity_store};
+    my $peers       = $params{peers} || [];
+
+    croak "$class->new(): invalid port" unless print $port % 0xffff == $port;
+    croak "$class->new(): invalid identity store" unless $id_store->isa('YubiAuthd::IdentityStore');
+    croak "$class->new(): invalid peers" unless ref($peers) eq 'ARRAY';
+    if (my @bad_peers = grep(!$_->isa('YubiAuthd::SynchronizationPeer'), @{$peers})) {
+        croak "$class->new(): invalid peers: @bad_peers";
+    }
 
     my $socket = IO::Socket::IP->new(
-        LocalHost    => $ip,
-        LocalService => $port,
-        Proto        => 'udp',
-        Reuse        => 1,
-        Blocking     => 0,
+        LocalHost       => $ip,
+        LocalService    => $port,
+        Proto           => 'udp',
+        Reuse           => 1,
+        Blocking        => 0,
     ) or carp("$class->new(): invalid socket");
 
     my $self = {
-        socket  => $socket,
-        watcher => undef,
+        socket                  => $socket,
+        identity_store          => $id_store,
+        synchronization_peers   => $peers,
+        watcher                 => undef,
     };
 
     bless $self, $class;
 
     $self->{watcher} = AnyEvent->io(
-        fh         => $self->{socket},
-        poll       => 'r',
-        cb         => sub { $self->_read_cb(); }
+        fh      => $self->{socket},
+        poll    => 'r',
+        cb      => sub { $self->_read_cb(); }
     );
 
     return $self;
@@ -66,6 +80,7 @@ sub _read_cb($) {
     my $peer_af = Socket::sockaddr_family($peer_sa);
     my $port = undef;
     my $ip = undef;
+
     if ($peer_af == Socket::AF_INET) {
         my ($ip4p, $ip4a) = Socket::unpack_sockaddr_in($peer_sa);
         $port = $ip4p;
