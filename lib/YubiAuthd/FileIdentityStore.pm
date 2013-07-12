@@ -54,7 +54,7 @@ sub load_by_username($$) {
     # Reject trivial case
     return undef unless -l $username_link;
 
-    my $id_builder = YubiAuthd::IdentityBuilder->new();
+    my $id_builder = YubiAuthd::IdentityBuilder->new($self);
     $id_builder->username($username);
 
     if (readlink($username_link) =~ m/\/keynums\/(\d+)$/) {

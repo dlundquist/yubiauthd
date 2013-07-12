@@ -2,7 +2,8 @@
 
 use strict;
 use warnings;
-use lib '../lib';
+use File::Basename;
+use lib dirname(__FILE__) . '/../lib';
 
 use EV;
 use AnyEvent;
@@ -12,7 +13,7 @@ use YubiAuthd::AuthenticationSocket;
 use YubiAuthd::SynchronizationSocket;
 use YubiAuthd::SynchronizationPeer;
 
-my $store = YubiAuthd::FileIdentityStore->new("../yubiauth");
+my $store = YubiAuthd::FileIdentityStore->new(dirname(__FILE__) . '/../yubiauth');
 my $peers = [
     YubiAuthd::SynchronizationPeer->new(
             ip_address  => '::1',

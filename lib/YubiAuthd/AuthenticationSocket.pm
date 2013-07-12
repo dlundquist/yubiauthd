@@ -36,18 +36,21 @@ sub new($%) {
     my $socket_path = $params{socket_path};
     my $identity_store = $params{identity_store};
 
+    croak "$class->new(): invalid identity store" unless $identity_store->isa('YubiAuthd::IdentityStore');
+
     unlink $socket_path if -S $socket_path;
     my $socket = IO::Socket::UNIX->new(
         Type        => SOCK_STREAM,
         Local       => $socket_path,
         Listen      => SOMAXCONN,
         Blocking    => 0,
-    ) or carp("$class->new(): invalid socket");
+    ) or croak "$class->new(): invalid socket";
 
     my $self = {
-        socket      => $socket,
-        socket_path => $socket_path,
-        watcher     => undef,
+        identity_store  => $identity_store,
+        socket_path     => $socket_path,
+        socket          => $socket,
+        watcher         => undef,
     };
 
     bless $self, $class;
@@ -61,13 +64,20 @@ sub new($%) {
     return $self;
 }
 
+sub identity_store($) {
+    my ($self) = @_;
+
+    return $self->{identity_store};
+}
+
+
 sub _read_cb($) {
     my ($self) = @_;
 
     my $sock = $self->{socket}->accept() or carp("read_cb: $!");
     my ($pid, $uid, $gid) = unpack('lll', $sock->sockopt(SO_PEERCRED));
 
-    return YubiAuthd::AuthenticationSession->new($sock, $pid, $uid, $gid);
+    return YubiAuthd::AuthenticationSession->new($sock, $pid, $uid, $gid, $self);
 }
 
 1;

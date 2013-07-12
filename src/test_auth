@@ -14,6 +14,6 @@ my $sock = IO::Socket::UNIX->new($sock_path)
 my $input = shift @ARGV;
 my $data;
 
-$sock->print("$input\n");
+$sock->print($input);
 
 print $sock->getline();

@@ -5,6 +5,7 @@ use strict;
 use warnings;
 
 require Exporter;
+use Carp;
 require YubiAuthd::Identity;
 
 our @ISA = qw(Exporter);
@@ -13,7 +14,7 @@ our @ISA = qw(Exporter);
 # names by default without a very good reason. Use EXPORT_OK instead.
 # Do not simply export all your public functions/methods/constants.
 
-# This allows declaration	use YubiAuthd::Identity ':all';
+# This allows declaration	use YubiAuthd::IdentityBuilder ':all';
 # If you do not need this, moving things directly into @EXPORT or @EXPORT_OK
 # will save memory.
 our %EXPORT_TAGS = ( 'all' => [ qw(
@@ -26,8 +27,10 @@ our @EXPORT = qw( );
 
 our $VERSION = '0.01';
 
-sub new() {
-    my ($class) = @_;
+sub new($$) {
+    my ($class, $store) = @_;
+
+    croak "$class->new(): invalid identity store" unless $store->isa('YubiAuthd::IdentityStore');
 
     my $self = {
         public_id       => undef,
@@ -36,7 +39,7 @@ sub new() {
         aes_key         => undef,
         uid             => undef,
         counter         => undef,
-        subscribers     => undef,
+        identity_store  => $store,
     };
 
     bless $self, $class;
@@ -47,13 +50,13 @@ sub build($) {
     my $self = shift;
 
     return YubiAuthd::Identity->new(
-        $self->{public_id},
-        $self->{serial_number},
-        $self->{username},
-        $self->{aes_key},
-        $self->{uid},
-        $self->{counter},
-        $self->{subscribers}
+        public_id       => $self->{public_id},
+        serial_number   => $self->{serial_number},
+        username        => $self->{username},
+        aes_key         => $self->{aes_key},
+        uid             => $self->{uid},
+        counter         => $self->{counter},
+        identity_store  => $self->{identity_store}
     );
 }
 
@@ -101,14 +104,6 @@ sub counter($$) {
     my ($self, $counter) = @_;
 
     $self->{counter} = $counter;
-
-    return $self;
-}
-
-sub subscribers($$) {
-    my ($self, $subscribers) = @_;
-
-    $self->{subscribers} = $subscribers;
 
     return $self;
 }

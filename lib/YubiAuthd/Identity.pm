@@ -26,24 +26,23 @@ our @EXPORT = qw( );
 
 our $VERSION = '0.01';
 
-sub new($$$$$$$$) {
+sub new($%) {
     my ($class,
-        $public_id,
-        $serial_number,
-        $username,
-        $aes_key,
-        $uid,
-        $counter,
-        $subscribers) = @_;
+        %params) = @_;
 
-    carp("$class->new(): invalid public_id") unless $public_id =~ /\A[cbdefghijklnrtuv]{12}\Z/;
-    carp("$class->new(): invalid username") unless $username =~ /\A[a-z_][a-z0-9_-]{0,30}\Z/;
-    carp("$class->new(): invalid aes_key") unless length($aes_key) == 32;
-    carp("$class->new(): invalid counter") unless $counter eq int($counter) + 0;
-    carp("$class->new(): invalid subscribers") unless ref($subscribers) eq 'ARRAY';
-    foreach my $subscriber (@{$subscribers}) {
-        carp("$class->new(): subscriber $subscriber does not respond to notify()") unless $subscriber->can('notify');
-    }
+    my $public_id       = $params{public_id};
+    my $serial_number   = $params{serial_number};
+    my $username        = $params{username};
+    my $aes_key         = $params{aes_key};
+    my $uid             = $params{uid};
+    my $counter         = $params{counter};
+    my $identity_store  = $params{identity_store};
+
+    croak "$class->new(): invalid public_id" unless $public_id =~ /\A[cbdefghijklnrtuv]{12}\Z/;
+    croak "$class->new(): invalid username" unless $username =~ /\A[a-z_][a-z0-9_-]{0,30}\Z/;
+    croak "$class->new(): invalid aes_key" unless length($aes_key) == 32;
+    croak "$class->new(): invalid counter" unless $counter eq int($counter) + 0;
+    croak "$class->new(): invalid identity_store" unless $identity_store->isa('YubiAuthd::IdentityStore');
 
     my $self = {
         public_id       => $public_id,
@@ -52,7 +51,7 @@ sub new($$$$$$$$) {
         aes_key         => $aes_key,
         uid             => $uid,
         counter         => int($counter),
-        subscribers     => $subscribers,
+        identity_store  => $identity_store,
     };
 
     bless $self, $class;
@@ -98,10 +97,24 @@ sub counter {
     return $self->{'counter'};
 }
 
+sub identity_store {
+    my ($self) = $@;
+
+    return $self->{identity_store};
+}
+
+sub subscribers {
+    my ($self) = $@;
+
+    return wantarray ?
+           @{$self->identity_store()->subscribers()} :
+           $self->identity_store()->subscribers();
+}
+
 sub _notify_subscribers($) {
     my ($self) = $@;
 
-    foreach my $subscriber (@{$self->{subscribers}}) {
+    foreach my $subscriber ($self->subscribers()) {
         $subscriber->notify($self);
     }
 }

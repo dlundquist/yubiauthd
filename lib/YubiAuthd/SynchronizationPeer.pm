@@ -7,7 +7,6 @@ use warnings;
 require Exporter;
 use Carp;
 use Socket;
-use Data::Dumper;
 
 our @ISA = qw(Exporter);
 
@@ -15,7 +14,7 @@ our @ISA = qw(Exporter);
 # names by default without a very good reason. Use EXPORT_OK instead.
 # Do not simply export all your public functions/methods/constants.
 
-# This allows declaration use YubiAuthd::Identity ':all';
+# This allows declaration use YubiAuthd::SynchronizationPeer ':all';
 # If you do not need this, moving things directly into @EXPORT or @EXPORT_OK
 # will save memory.
 our %EXPORT_TAGS = ( 'all' => [ qw(
@@ -31,8 +30,6 @@ our $VERSION = '0.01';
 sub new($%) {
     my ($class,
         %params) = @_;
-
-    print Dumper \@_;
 
     my $ip          = $params{ip_address};
     my $port        = $params{port};
