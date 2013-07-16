@@ -31,16 +31,28 @@ sub new($%) {
     my ($class,
         %params) = @_;
 
-    my $public_id       = $params{public_id};
+    my $public_id       = undef;
     my $serial_number   = $params{serial_number};
-    my $username        = $params{username};
+    my $username        = undef;
     my $aes_key         = $params{aes_key};
     my $uid             = $params{uid};
     my $counter         = $params{counter};
     my $identity_store  = $params{identity_store};
 
-    croak "$class->new(): invalid public_id" unless $public_id =~ /\A[cbdefghijklnrtuv]{12}\Z/;
-    croak "$class->new(): invalid username" unless $username =~ /\A[a-z_][a-z0-9_-]{0,30}\Z/;
+    # Untaint public_id
+    if ($params{public_id} =~ m/\A([cbdefghijklnrtuv]{12})\Z/) {
+        $public_id = $1;
+    } else {
+        croak "$class->new(): invalid public_id";
+    }
+
+    # Untaint username
+    if ($params{username} =~ /\A([a-z_][a-z0-9_-]{0,30})\Z/) {
+        $username = $1;
+    } else {
+        croak "$class->new(): invalid username";
+    }
+
     croak "$class->new(): invalid aes_key" unless length($aes_key) == 32;
     croak "$class->new(): invalid counter" unless $counter eq int($counter) + 0;
     croak "$class->new(): invalid identity_store" unless $identity_store->isa('YubiAuthd::IdentityStore');
