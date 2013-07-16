@@ -1,0 +1,25 @@
+#!/usr/bin/perl -T
+use strict;
+use warnings;
+use IO::Socket::UNIX qw( SOCK_STREAM );
+use constant {
+    YUBI_AUTHD_SOCK => '/tmp/yubiauth.sock',
+};
+
+unless (scalar(@ARGV) == 1) {
+    print STDERR "Usage:\n\tyubiauth <yubi token>\n";
+    exit 1;
+}
+
+my $yubi_token = shift @ARGV;
+
+die YUBI_AUTHD_SOCK . " is not a socket\n" unless -S YUBI_AUTHD_SOCK;
+
+my $sock = IO::Socket::UNIX->new(YUBI_AUTHD_SOCK)
+    or die $!;
+
+$sock->print($yubi_token);
+
+exit 1 unless $sock->getline() eq 'AUTHENTICATION SUCCESSFUL\n';
+
+exit 0;
