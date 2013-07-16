@@ -74,6 +74,12 @@ sub serial_number($) {
     return $self->{'serial_number'};
 }
 
+sub uid($) {
+    my $self = shift;
+
+    return $self->{'uid'};
+}
+
 sub username($) {
     my $self = shift;
 

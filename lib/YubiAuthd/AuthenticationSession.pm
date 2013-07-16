@@ -8,6 +8,7 @@ require Exporter;
 use Carp;
 use Data::Dumper;
 require AnyEvent;
+require YubiAuthd::AuthenticationChallenge;
 use constant {
     AUTH_CHALLENGE_LENGTH => 44,
 };
@@ -115,11 +116,14 @@ sub _read_cb($) {
     return if ($self->remaining_challenge_bytes() > 0); # Incomplete request
 
     my $challenge_id = $self->challenge_identity();
+    $self->shutdown unless $challenge_id;
+
     my $socket_id = $self->socket_identity();
+    $self->shutdown unless $challenge_id->public_id eq $socket_id->public_id;
 
-    $self->{input_buffer} = "";
-
-    $self->shutdown();
+    $self->{client_socket}->send("AUTHENTICATION SUCCESSFUL\n");
+    $self->{client_socket}->shutdown(2);
+    $self->{watcher} = undef;
 }
 
 sub shutdown($) {

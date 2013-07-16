@@ -36,11 +36,12 @@ sub new($$$) {
     croak "$class->new(): incomplete challenge" unless length($challenge) == AUTH_CHALLENGE_LENGTH;
     croak "$class->new(): invalid identity store" unless $identity_store->isa('YubiAuthd::IdentityStore');
 
+
     # Untaint our challenge string
-    if ($challenge =~ m/^[cbdefghijklnrtuv]{AUTH_CHALLENGE_LENGTH}$/) {
+    if ($challenge =~ m/^([cbdefghijklnrtuv]{44})$/) {
         $challenge = $1;
     } else {
-        croak "$class->new(): invalid challenge modhex"
+        croak "$class->new(): invalid challenge modhex: $challenge";
     }
 
     my $self = {
@@ -56,7 +57,7 @@ sub new($$$) {
 sub public_id($) {
     my ($self) = @_;
 
-    return substr $self->{challenge}, 0, 12;
+    return substr($self->{challenge}, 0, 12);
 }
 
 sub identity($) {
@@ -68,9 +69,24 @@ sub identity($) {
 sub authenticate($) {
     my ($self) = @_;
 
-    my $newstate = auth_otp($code,$privateid,$aeskey,$laststate);
-    authfail() unless ($newstate);
+    my $id = $self->identity;
 
+    my ($ykpid, $yksid, $ykcounter, $yktimestamp, $yksession, $ykrand, $ykcrcdec, $ykcrcok) =
+        Auth::Yubikey_Decrypter::yubikey_decrypt($self->{challenge}, $id->aes_key);
+
+    return undef unless $ykcrcok && $yksid eq $id->uid;
+
+    my $old_counter = $id->counter;
+    my $new_counter = $ykcounter * 1000 + $yksession;
+
+    # Update the counter
+    $id->counter($new_counter);
+
+    # Do not authenticate unless the counter was successfully updated
+    return undef unless $new_counter > $old_counter;
+
+    # Auth Challenge successful
+    return $id;
 }
 
 1;
