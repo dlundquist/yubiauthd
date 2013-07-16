@@ -35,7 +35,7 @@ sub new($%) {
     my $port        = $params{port};
     my $shared_key  = $params{shared_key};
 
-    croak "$class->new(): invalid port" unless print $port % 0xffff == $port;
+    croak "$class->new(): invalid port" unless $port % 0xffff == $port;
     croak "$class->new(): key is too short" unless length($shared_key) >= 16;
 
     my $ip_addr = undef;

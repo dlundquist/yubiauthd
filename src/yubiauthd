@@ -32,6 +32,7 @@ my $auth_socket = YubiAuthd::AuthenticationSocket->new(
         socket_path     => "/tmp/yubiauth.sock",
         identity_store  => $store
         );
+
 my $sync_socket = YubiAuthd::SynchronizationSocket->new(
         ip_address      => '::',
         port            => 16000,
