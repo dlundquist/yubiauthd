@@ -70,6 +70,7 @@ sub authenticate($) {
     my ($self) = @_;
 
     my $id = $self->identity;
+    return undef unless $id;
 
     my ($ykpid, $yksid, $ykcounter, $yktimestamp, $yksession, $ykrand, $ykcrcdec, $ykcrcok) =
         Auth::Yubikey_Decrypter::yubikey_decrypt($self->{challenge}, $id->aes_key);
