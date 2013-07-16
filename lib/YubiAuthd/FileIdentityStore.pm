@@ -46,6 +46,77 @@ sub new {
     return $self;
 }
 
+sub load_by_public_id($$) {
+    my ($self, $public_id) = @_;
+
+    my $id_builder = YubiAuthd::IdentityBuilder->new($self);
+    my $serial_number = undef;
+
+    # First lookup the serial number with a full directory scan
+    opendir(SERIAL_DIR, $self->{store_dir} . '/keynums')
+        or croak "Failed to open keynums dir";
+    while (my $filename = readdir(SERIAL_DIR)) {
+        my $filepath = $self->{store_dir} . '/keynums/' . $filename;
+
+        next unless -f $filepath and -r $filepath;
+
+        open(SERIAL_FILE, $filepath)
+            or croak "Failed to open $filepath";
+
+        if (<SERIAL_FILE> =~ m/^$public_id$/) {
+            $serial_number = $filename;
+            $id_builder->serial_number($serial_number);
+            $id_builder->public_id($public_id);
+        }
+
+        close(SERIAL_FILE);
+    }
+    closedir(SERIAL_DIR);
+
+    unless ($serial_number) {
+        carp "Unable to find public_id " . $public_id;
+        return undef;
+    }
+
+
+    # Lookup the username with another full directory scan
+    opendir(USERNAME_DIR, $self->{store_dir} . '/users')
+        or croak "Failed to open keynums dir";
+    while (my $username = readdir(USERNAME_DIR)) {
+        my $filepath = $self->{store_dir} . '/users/' . $username;
+
+        next unless -l $filepath and -r $filepath;
+
+        if (readlink($filepath) =~ m/\/keynums\/$serial_number$/) {
+            $id_builder->username($username);
+        }
+    }
+    closedir(USERNAME_DIR);
+
+    my $key_file = "$self->{store_dir}/keys/$public_id";
+
+    open(KEY_FH, $key_file)
+        or croak("open: $!");
+    my $uid = <KEY_FH>;
+    chomp($uid);
+    $uid =~ s/\s+//g;
+    $id_builder->uid($uid);
+    my $aes_key = <KEY_FH>;
+    chomp($aes_key);
+    $aes_key =~ s/\s+//g;
+    $id_builder->aes_key($aes_key);
+    close(KEY_FH);
+
+    my $state_file = "$self->{store_dir}/state/$public_id";
+    open(STATE_FH, $state_file)
+        or die("open: $!");
+    my $counter = int(<STATE_FH>);
+    $id_builder->counter($counter);
+    close(STATE_FH);
+
+    return $id_builder->build;
+}
+
 sub load_by_username($$) {
     my ($self, $username) = @_;
 

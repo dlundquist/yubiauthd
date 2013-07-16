@@ -31,15 +31,29 @@ our $VERSION = '0.01';
 # Preloaded methods go here.
 
 sub new {
-    die "This method must be overridden by a subclass of __PACKAGE__";
+    my $class = shift;
+    die "This method must be overridden by $class or another subclass of " . __PACKAGE__;
 }
 
-sub find_by_public_id {
-    die "This method must be overridden by a subclass of __PACKAGE__";
+sub load_by_public_id {
+    my $self = shift;
+    my $class = ref $self;
+
+    die "This method must be overridden by $class or another subclass of " . __PACKAGE__;
 }
 
-sub find_by_serial_number {
-    die "This method must be overridden by a subclass of __PACKAGE__";
+sub load_by_serial_number {
+    my $self = shift;
+    my $class = ref $self;
+
+    die "This method must be overridden by $class or another subclass of " . __PACKAGE__;
+}
+
+sub load_by_username {
+    my $self = shift;
+    my $class = ref $self;
+
+    die "This method must be overridden by $class or another subclass of " . __PACKAGE__;
 }
 
 sub subscribe($$) {

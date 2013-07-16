@@ -3,6 +3,21 @@
 use strict;
 use warnings;
 use IO::Socket::IP;
+use File::Basename;
+use lib dirname(__FILE__) . '/../lib';
+use YubiAuthd::SynchronizationMessage;
+
+
+unless (scalar(@ARGV) == 4) {
+    print STDERR "Usage:\n\ttest_sync <port> <key> <public_id> <counter>\n";
+    exit 1;
+}
+my $port = shift @ARGV;
+my $shared_key = shift @ARGV;
+my $public_id = shift @ARGV;
+my $counter = shift @ARGV;
+
+print "Sending counter update for $public_id to $port with counter value $counter\n";
 
 my $sock = IO::Socket::IP->new(
     PeerHost    => '::1',
@@ -10,4 +25,9 @@ my $sock = IO::Socket::IP->new(
     Proto       => 'udp',
 ) or die $!;
 
-$sock->send("jdslfjdslfjdslfjdlskjfldsjflksdjfds\n") or warn "$!";
+my $sm = YubiAuthd::SynchronizationMessage->new(
+    public_id => $public_id,
+    counter   => $counter
+);
+
+$sock->send($sm->payload($shared_key)) or warn "$!";

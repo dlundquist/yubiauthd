@@ -5,11 +5,13 @@ use strict;
 use warnings;
 
 require Exporter;
-use Carp;
 require IO::Socket::IP;
 require Socket;
 require AnyEvent;
 require YubiAuthd::IdentityStore;
+require YubiAuthd::SynchronizationMessage;
+use Carp;
+use Data::Dumper;
 
 
 our @ISA = qw(Exporter);
@@ -73,6 +75,18 @@ sub new($%) {
     return $self;
 }
 
+sub _lookup_peer($$) {
+    my ($self, $ip) = @_;
+
+    foreach my $peer (@{$self->{synchronization_peers}}) {
+        return $peer if ($peer->ip eq $ip);
+    }
+
+    carp "Unkown peer $ip";
+
+    return undef;
+}
+
 sub _read_cb($) {
     my ($self) = @_;
     my $msg;
@@ -91,10 +105,24 @@ sub _read_cb($) {
         $ip = Socket::inet_ntop(Socket::AF_INET6, $ip6a);
     } else {
         carp("unexpected address family $peer_af");
+        return;
     }
 
-    print "SYNC PEER:\t$ip $port\n";
-    print "SYNC DATA:\t$msg\n";
+    eval {
+        my $peer = $self->_lookup_peer($ip);
+        return unless $peer;
+
+        my $sync_msg = YubiAuthd::SynchronizationMessage->new(
+                payload => $msg,
+                key     => $peer->shared_key
+                );
+
+        my $id = $self->{identity_store}->load_by_public_id($sync_msg->public_id);
+        return unless $id;
+
+        $id->counter($sync_msg->counter);
+    };
+    carp $@ if ($@);
 }
 
 1;

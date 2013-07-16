@@ -5,6 +5,7 @@ use strict;
 use warnings;
 
 require Exporter;
+require Scalar::Util;
 use Carp;
 
 our @ISA = qw(Exporter);
@@ -53,6 +54,9 @@ sub new($%) {
         counter         => int($counter),
         identity_store  => $identity_store,
     };
+
+    # Prevent circular reference (id -> id_store -> subscribers includes id)
+    Scalar::Util::weaken($self->{identity_store});
 
     bless $self, $class;
 

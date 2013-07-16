@@ -73,7 +73,7 @@ sub identity_store($) {
     return $self->authentication_socket()->identity_store();
 }
 
-sub identity($) {
+sub socket_identity($) {
     my ($self) = @_;
 
     return $self->identity_store()->load_by_username($self->username());
@@ -85,31 +85,51 @@ sub remaining_challenge_bytes($) {
     return AUTH_CHALLENGE_LENGTH - length($self->{input_buffer});
 }
 
-sub _read_cb($) {
+sub challenge_identity($) {
     my ($self) = @_;
 
-    my $msg = undef;
-    $self->{client_socket}->recv($msg, $self->remaining_challenge_bytes(), 0);
+    return undef if $self->remaining_challenge_bytes();
 
-    unless ($msg) {
-        carp ref($self) . "->_read_cb(): client closed connection";
-        $self->{client_socket}->shutdown(2);
-        $self->{watcher} = undef;
-        return;
+    my $identity = undef;
+    eval {
+        my $challenge = YubiAuthd::AuthenticationChallenge->new($self->{input_buffer}, $self->identity_store());
+        $identity = $challenge->authenticate();
+    };
+    if ($@) {
+        carp $@;
+        return undef;
     }
+
+    return $identity;
+}
+
+sub _read_cb($) {
+    my ($self) = @_;
+    my $msg = undef;
+
+    $self->{client_socket}->recv($msg, $self->remaining_challenge_bytes(), 0);
+    return $self->shutdown() unless ($msg); # Client closed connection
 
     $self->{input_buffer} .= $msg;
 
     return if ($self->remaining_challenge_bytes() > 0); # Incomplete request
 
-    #my $challenge = YubiAuthd::AuthenticationChallenge->new($self->{input_buffer}, $self->identity_store());
+    my $challenge_id = $self->challenge_identity();
+    my $socket_id = $self->socket_identity();
 
-    print "received auth challenge: $self->{input_buffer}\n";
     $self->{input_buffer} = "";
+
+    $self->shutdown();
+}
+
+sub shutdown($) {
+    my ($self) = @_;
 
     $self->{client_socket}->send("DENIED\n");
     $self->{client_socket}->shutdown(2);
     $self->{watcher} = undef;
+
+    return undef;
 }
 
 1;
