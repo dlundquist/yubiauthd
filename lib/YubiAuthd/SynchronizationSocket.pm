@@ -11,7 +11,6 @@ require AnyEvent;
 require YubiAuthd::IdentityStore;
 require YubiAuthd::SynchronizationMessage;
 use Carp;
-use Data::Dumper;
 
 
 our @ISA = qw(Exporter);
@@ -42,7 +41,7 @@ sub new($%) {
     my $id_store    = $params{identity_store};
     my $peers       = $params{peers} || [];
 
-    croak "$class->new(): invalid port" unless print $port % 0xffff == $port;
+    croak "$class->new(): invalid port" unless $port % 0xffff == $port;
     croak "$class->new(): invalid identity store" unless $id_store->isa('YubiAuthd::IdentityStore');
     croak "$class->new(): invalid peers" unless ref($peers) eq 'ARRAY';
     if (my @bad_peers = grep(!$_->isa('YubiAuthd::SynchronizationPeer'), @{$peers})) {
@@ -65,6 +64,11 @@ sub new($%) {
     };
 
     bless $self, $class;
+
+    # Subscribe each peer to the identity store
+    foreach my $peer (@{$self->{synchronization_peers}}) {
+        $id_store->subscribe($peer);
+    }
 
     $self->{watcher} = AnyEvent->io(
         fh      => $self->{socket},

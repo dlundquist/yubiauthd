@@ -5,6 +5,7 @@ use strict;
 use warnings;
 
 require Exporter;
+use Carp;
 
 our @ISA = qw(Exporter);
 
@@ -32,7 +33,14 @@ our $VERSION = '0.01';
 
 sub new {
     my $class = shift;
-    die "This method must be overridden by $class or another subclass of " . __PACKAGE__;
+
+    my $self = {
+        subscribers => [],
+    };
+
+    bless $self, $class;
+
+    return $self;
 }
 
 sub load_by_public_id {
@@ -57,14 +65,13 @@ sub load_by_username {
 }
 
 sub subscribe($$) {
-    my ($self, $subscriber) = $@;
+    my ($self, $subscriber) = @_;
 
-    $self->{subscribers} ||= [];
     push(@{$self->{subscribers}}, $subscriber);
 }
 
 sub subscribers($) {
-    my ($self) = $@;
+    my ($self) = @_;
 
     return $self->{subscribers};
 }

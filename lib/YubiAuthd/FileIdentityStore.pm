@@ -7,7 +7,9 @@ use warnings;
 require Exporter;
 require YubiAuthd::IdentityStore;
 require YubiAuthd::IdentityBuilder;
+require YubiAuthd::Identity;
 use Carp;
+use Data::Dumper;
 
 our @ISA = qw(Exporter YubiAuthd::IdentityStore);
 
@@ -29,6 +31,9 @@ our $VERSION = '0.01';
 
 sub new {
     my $class = shift;
+
+    my $self = $class->SUPER::new($class, @_);
+
     my $store_dir = shift;
 
     carp("$class->new(): invalid store_dir") unless -d $store_dir &&
@@ -37,11 +42,11 @@ sub new {
                                                        "$store_dir/state" &&
                                                        "$store_dir/users";
 
-    my $self = {
-        store_dir => $store_dir
-    };
+    $self->{store_dir} = $store_dir;
 
     bless $self, $class;
+
+    $self->subscribe($self);
 
     return $self;
 }
@@ -161,6 +166,17 @@ sub load_by_username($$) {
     close(STATE_FH);
 
     return $id_builder->build;
+}
+
+sub notify($$) {
+    my ($self, $identity) = @_;
+    my $state_file = $self->{store_dir} . '/state/' . $identity->public_id;
+
+    open(STATE, '>', $state_file)
+        or croak "Unable to open $state_file: $!";
+    print STATE $identity->counter;
+    close(STATE)
+        or croak "Unable to close $state_file: $!";
 }
 
 1;

@@ -14,18 +14,20 @@ use YubiAuthd::SynchronizationSocket;
 use YubiAuthd::SynchronizationPeer;
 
 my $store = YubiAuthd::FileIdentityStore->new(dirname(__FILE__) . '/../yubiauth');
+
 my $peers = [
     YubiAuthd::SynchronizationPeer->new(
             ip_address  => '::1',
-            port        => 15000,
+            port        => 16000,
             shared_key  => 'secret_pass_phrase'
             ),
     YubiAuthd::SynchronizationPeer->new(
             ip_address  => '127.0.0.1',
-            port        => 15000,
+            port        => 16000,
             shared_key  => 'secret_pass_phrase'
             ),
 ];
+
 my $auth_socket = YubiAuthd::AuthenticationSocket->new(
         socket_path     => "/tmp/yubiauth.sock",
         identity_store  => $store
@@ -36,6 +38,8 @@ my $sync_socket = YubiAuthd::SynchronizationSocket->new(
         identity_store  => $store,
         peers           => $peers
         );
+
+print "Started!\n";
 
 # Run our event loop
 AnyEvent->condvar->recv;

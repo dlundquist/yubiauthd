@@ -59,7 +59,6 @@ sub new($%) {
     Scalar::Util::weaken($self->{identity_store});
 
     bless $self, $class;
-
     return $self;
 }
 
@@ -87,7 +86,7 @@ sub aes_key($) {
     return $self->{'aes_key'};
 }
 
-sub counter {
+sub counter($) {
     my $self = shift;
     my $counter = shift;
 
@@ -101,24 +100,23 @@ sub counter {
     return $self->{'counter'};
 }
 
-sub identity_store {
-    my ($self) = $@;
+sub identity_store($) {
+    my ($self) = @_;
 
     return $self->{identity_store};
 }
 
-sub subscribers {
-    my ($self) = $@;
+sub subscribers($) {
+    my ($self) = @_;
+    my $subscribers = $self->identity_store->subscribers;
 
-    return wantarray ?
-           @{$self->identity_store()->subscribers()} :
-           $self->identity_store()->subscribers();
+    return wantarray ? @{$subscribers} : $subscribers;
 }
 
 sub _notify_subscribers($) {
-    my ($self) = $@;
+    my ($self) = @_;
 
-    foreach my $subscriber ($self->subscribers()) {
+    foreach my $subscriber ($self->subscribers) {
         $subscriber->notify($self);
     }
 }

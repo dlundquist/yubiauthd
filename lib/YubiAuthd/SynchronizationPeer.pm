@@ -101,4 +101,24 @@ sub shared_key($) {
     return $self->{shared_key};
 }
 
+sub notify($$) {
+    my ($self, $identity) = @_;
+
+    my $sync_message = YubiAuthd::SynchronizationMessage->new(
+            public_id => $identity->public_id,
+            counter   => $identity->counter
+            );
+
+    my $sock = IO::Socket::IP->new(
+            PeerHost    => $self->ip,
+            PeerService => $self->port,
+            Proto       => 'udp',
+            ) or croak "Unable to open UDP socket:  $!";
+
+    $sock->send($sync_message->payload($self->shared_key))
+        or croak "Unabel to send UDP synchronization message: $!";
+
+    $sock->shutdown(2);
+}
+
 1;
