@@ -113,11 +113,13 @@ sub load_by_public_id($$) {
     close(KEY_FH);
 
     my $state_file = "$self->{store_dir}/state/$public_id";
-    open(STATE_FH, $state_file)
-        or die("open: $!");
-    my $counter = int(<STATE_FH>);
-    $id_builder->counter($counter);
-    close(STATE_FH);
+    if (open(STATE_FH, $state_file)) {
+        my $counter = int(<STATE_FH>);
+        $id_builder->counter($counter);
+        close(STATE_FH);
+    } else {
+        $id_builder->counter(0);
+    }
 
     return $id_builder->build;
 }
@@ -159,11 +161,13 @@ sub load_by_username($$) {
     close(KEY_FH);
 
     my $state_file = "$self->{store_dir}/state/$public_id";
-    open(STATE_FH, $state_file)
-        or die("open: $!");
-    my $counter = int(<STATE_FH>);
-    $id_builder->counter($counter);
-    close(STATE_FH);
+    if (open(STATE_FH, $state_file)) {
+        my $counter = int(<STATE_FH>);
+        $id_builder->counter($counter);
+        close(STATE_FH);
+    } else {
+        $id_builder->counter(0);
+    }
 
     return $id_builder->build;
 }
