@@ -8,24 +8,24 @@ use lib dirname(__FILE__) . '/../lib';
 use EV;
 use AnyEvent;
 use Data::Dumper;
-use YubiAuthd::FileIdentityStore;
+use YubiAuthd::SQLiteIdentityStore;
 use YubiAuthd::AuthenticationSocket;
 use YubiAuthd::SynchronizationSocket;
 use YubiAuthd::SynchronizationPeer;
 
-my $store = YubiAuthd::FileIdentityStore->new(dirname(__FILE__) . '/../yubiauth');
+my $store = YubiAuthd::SQLiteIdentityStore->new(dirname(__FILE__) . '/../yubiauthd.sqlite');
 
 my $peers = [
-    YubiAuthd::SynchronizationPeer->new(
-            ip_address  => '::1',
-            port        => 16000,
-            shared_key  => 'secret_pass_phrase'
-            ),
-    YubiAuthd::SynchronizationPeer->new(
-            ip_address  => '127.0.0.1',
-            port        => 16000,
-            shared_key  => 'secret_pass_phrase'
-            ),
+#    YubiAuthd::SynchronizationPeer->new(
+#            ip_address  => '::1',
+#            port        => 16000,
+#            shared_key  => 'secret_pass_phrase'
+#            ),
+#    YubiAuthd::SynchronizationPeer->new(
+#            ip_address  => '127.0.0.1',
+#            port        => 16000,
+#            shared_key  => 'secret_pass_phrase'
+#            ),
 ];
 
 my $auth_socket = YubiAuthd::AuthenticationSocket->new(

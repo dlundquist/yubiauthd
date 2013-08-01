@@ -116,10 +116,10 @@ sub _read_cb($) {
     return if ($self->remaining_challenge_bytes() > 0); # Incomplete request
 
     my $challenge_id = $self->challenge_identity();
-    $self->shutdown unless defined $challenge_id;
+    return $self->shutdown unless defined $challenge_id;
 
     my $socket_id = $self->socket_identity();
-    $self->shutdown unless defined $socket_id and $challenge_id->public_id eq $socket_id->public_id;
+    return $self->shutdown unless defined $socket_id and $challenge_id->public_id eq $socket_id->public_id;
 
     $self->{client_socket}->send("AUTHENTICATION SUCCESSFUL\n");
     $self->{client_socket}->shutdown(2);

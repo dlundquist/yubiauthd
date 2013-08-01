@@ -1,0 +1,21 @@
+#!/usr/bin/perl -T
+
+use strict;
+use warnings;
+use File::Basename;
+use lib dirname(__FILE__) . '/../lib';
+
+use YubiAuthd::FileIdentityStore;
+use YubiAuthd::SQLiteIdentityStore;
+
+my $file_store = YubiAuthd::FileIdentityStore->new(dirname(__FILE__) . '/../yubiauth');
+my $db_store = YubiAuthd::SQLiteIdentityStore->new(dirname(__FILE__) . '/../yubiauthd.sqlite');
+
+my $username = shift @ARGV
+    or die "Usage: import_identity <username>";
+
+my $id = $file_store->load_by_username($username)
+    or die "unknown identity $username";
+
+$db_store->store_identity($id);
+
