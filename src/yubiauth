@@ -20,6 +20,6 @@ my $sock = IO::Socket::UNIX->new(YUBI_AUTHD_SOCK)
 
 $sock->print($yubi_token);
 
-exit 1 unless $sock->getline() eq 'AUTHENTICATION SUCCESSFUL\n';
+exit 1 unless $sock->getline() eq "AUTHENTICATION SUCCESSFUL\n";
 
 exit 0;

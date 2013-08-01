@@ -70,12 +70,23 @@ sub authenticate($) {
     my ($self) = @_;
 
     my $id = $self->identity;
-    return undef unless $id;
+    unless ($id) {
+        carp "Unknown identity";
+        return undef;
+    }
 
     my ($ykpid, $yksid, $ykcounter, $yktimestamp, $yksession, $ykrand, $ykcrcdec, $ykcrcok) =
         Auth::Yubikey_Decrypter::yubikey_decrypt($self->{challenge}, $id->aes_key);
 
-    return undef unless $ykcrcok && $yksid eq $id->uid;
+    unless ($ykcrcok) {
+        carp "YubiKey CRC invalid";
+        return undef;
+    }
+
+    unless ($yksid eq $id->uid) {
+        carp "YubiKey UID mismatch";
+        return undef;
+    }
 
     my $old_counter = $id->counter;
     my $new_counter = $ykcounter * 1000 + $yksession;
@@ -83,7 +94,7 @@ sub authenticate($) {
     # Update the counter
     $id->counter($new_counter);
 
-    # Do not authenticate unless the counter was successfully updated
+    # Do not authenticate unless the counter was incremented
     return undef unless $new_counter > $old_counter;
 
     # Auth Challenge successful

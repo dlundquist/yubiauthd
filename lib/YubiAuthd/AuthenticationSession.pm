@@ -6,7 +6,6 @@ use warnings;
 
 require Exporter;
 use Carp;
-use Data::Dumper;
 require AnyEvent;
 require YubiAuthd::AuthenticationChallenge;
 use constant {
@@ -115,23 +114,26 @@ sub _read_cb($) {
 
     return if ($self->remaining_challenge_bytes() > 0); # Incomplete request
 
-    my $challenge_id = $self->challenge_identity();
-    return $self->shutdown unless defined $challenge_id;
+    my $challenge_id = $self->challenge_identity()
+        or return $self->shutdown("Unable to find challenge identity");
 
-    my $socket_id = $self->socket_identity();
-    return $self->shutdown unless defined $socket_id and $challenge_id->public_id eq $socket_id->public_id;
+    my $socket_id = $self->socket_identity()
+        or return $self->shutdown("Unable to find socket identity");
+
+    return $self->shutdown("Socket and challenge identities do no match") unless $challenge_id->public_id eq $socket_id->public_id;
 
     $self->{client_socket}->send("AUTHENTICATION SUCCESSFUL\n");
     $self->{client_socket}->shutdown(2);
     $self->{watcher} = undef;
 }
 
-sub shutdown($) {
-    my ($self) = @_;
+sub shutdown($$) {
+    my ($self, $reason) = @_;
 
     $self->{client_socket}->send("DENIED\n");
     $self->{client_socket}->shutdown(2);
     $self->{watcher} = undef;
+    carp $reason;
 
     return undef;
 }
