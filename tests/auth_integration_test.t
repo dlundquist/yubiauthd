@@ -13,26 +13,37 @@ use YubiAuthd::Identity;
 use YubiAuthd::SQLiteIdentityStore;
 use YubiAuthd::AuthenticationSocket;
 
-my $otps = [
-    'vvvvvvvvvvvvgvndkrfkgclkktfftnnckctrhjdcdkid',
-    'vvvvvvvvvvvvfrejuvtrhdgjbfdvirhnrhfdnnujdkfv',
-    'vvvvvvvvvvvvlfftgeblljetvrbfgtvgfcklcgidjtdb',
-    'vvvvvvvvvvvvbhkhklvucncruneeilrbvvuilbthdrth',
-    'vvvvvvvvvvvvnlhrddtkfihecunhrvcbifbrunlbcbev',
-    'vvvvvvvvvvvvvetjunjudeuevtcdnrcrkluinjgdggji',
-    'vvvvvvvvvvvvuubrlgjkihehdtglvrfiuvcgjehffukr',
-    'vvvvvvvvvvvvevlkturcnljbtjhcihgtitvubdutiueg',
-    'vvvvvvvvvvvvecedhlicgrgvvlvctknfuibrfhcgkehj',
-    'vvvvvvvvvvvvtkjfkvjfcnhbtvkttvtkjduvjjcbdcrn',
-];
+# Open Time Passwords for this test YubiKey:
+#
+#    vvvvvvvvvvvvgvndkrfkgclkktfftnnckctrhjdcdkid
+#    vvvvvvvvvvvvfrejuvtrhdgjbfdvirhnrhfdnnujdkfv
+#    vvvvvvvvvvvvlfftgeblljetvrbfgtvgfcklcgidjtdb
+#    vvvvvvvvvvvvbhkhklvucncruneeilrbvvuilbthdrth
+#    vvvvvvvvvvvvnlhrddtkfihecunhrvcbifbrunlbcbev
+#    vvvvvvvvvvvvvetjunjudeuevtcdnrcrkluinjgdggji
+#    vvvvvvvvvvvvuubrlgjkihehdtglvrfiuvcgjehffukr
+#    vvvvvvvvvvvvevlkturcnljbtjhcihgtitvubdutiueg
+#    vvvvvvvvvvvvecedhlicgrgvvlvctknfuibrfhcgkehj
+#    vvvvvvvvvvvvtkjfkvjfcnhbtvkttvtkjduvjjcbdcrn
 
 my $db_path = tmpnam() . '.sqlite';
 my $auth_sock_path = tmpnam() . '.sock';
 
-my $pid = fork();
-die "fork: $!" unless defined $pid;
+sub try_auth($) {
+    my $otp = shift;
 
-unless ($pid) {
+    my $sock = IO::Socket::UNIX->new($auth_sock_path)
+        or die $!;
+
+    $sock->print($otp);
+
+    return $sock->getline() eq "AUTHENTICATION SUCCESSFUL\n";
+}
+
+my $pid = fork();
+unless (defined $pid) {
+    die "fork: $!";
+} elsif ($pid == 0) {
     my $store = YubiAuthd::SQLiteIdentityStore->new($db_path);
 
     my $id = YubiAuthd::Identity->new(
@@ -59,18 +70,8 @@ unless ($pid) {
     exit(0);
 }
 
-sub try_auth($) {
-    my $otp = shift;
-
-    my $sock = IO::Socket::UNIX->new($auth_sock_path)
-        or die $!;
-
-    $sock->print($otp);
-
-    return $sock->getline() eq "AUTHENTICATION SUCCESSFUL\n";
-}
-
-sleep(1);
+# Wait for server to start
+sleep 1;
 
 is( try_auth('vvvvvvvvvvvvgvndkrfkgclkktfftnnckctrhjdcdkid'), 1, "First use of OTP");
 is( try_auth('vvvvvvvvvvvvgvndkrfkgclkktfftnnckctrhjdcdkid'), '', "Second use of OTP");
