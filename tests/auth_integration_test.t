@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!/usr/bin/perl -T
 
 use Test::More tests => 6;
 
@@ -29,6 +29,9 @@ use YubiAuthd::AuthenticationSocket;
 my $db_path = tmpnam() . '.sqlite';
 my $auth_sock_path = tmpnam() . '.sock';
 
+#
+# Simple yubiauth client
+#
 sub try_auth($) {
     my $otp = shift;
 
@@ -40,6 +43,9 @@ sub try_auth($) {
     return $sock->getline() eq "AUTHENTICATION SUCCESSFUL\n";
 }
 
+#
+# Start up a yubiauthd server without any synchronization peers
+#
 my $pid = fork();
 unless (defined $pid) {
     die "fork: $!";
@@ -63,8 +69,6 @@ unless (defined $pid) {
         identity_store  => $store
     );
 
-    print "starting yubiauthd\n";
-
     # Run our event loop
     AnyEvent->condvar->recv;
     exit(0);
@@ -83,6 +87,7 @@ kill $pid;
 
 is($?, 0, "Server exited successfully");
 
+# Clean up test files
 unlink $db_path;
 unlink $auth_sock_path;
 
