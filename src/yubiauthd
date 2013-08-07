@@ -3,44 +3,182 @@
 use strict;
 use warnings;
 use File::Basename;
-use lib dirname(__FILE__) . '/../lib';
-
+use Getopt::Long;
+use POSIX;
 use EV;
 use AnyEvent;
-use Data::Dumper;
+
+use lib dirname(__FILE__) . '/../lib';
+use YubiAuthd::FileIdentityStore;
 use YubiAuthd::SQLiteIdentityStore;
 use YubiAuthd::AuthenticationSocket;
 use YubiAuthd::SynchronizationSocket;
 use YubiAuthd::SynchronizationPeer;
 
-my $store = YubiAuthd::SQLiteIdentityStore->new(dirname(__FILE__) . '/../yubiauthd.sqlite');
+sub parse_config($) {
+    my $filename = shift;
 
-my $peers = [
-#    YubiAuthd::SynchronizationPeer->new(
-#            ip_address  => '::1',
-#            port        => 16000,
-#            shared_key  => 'secret_pass_phrase'
-#            ),
-#    YubiAuthd::SynchronizationPeer->new(
-#            ip_address  => '127.0.0.1',
-#            port        => 16000,
-#            shared_key  => 'secret_pass_phrase'
-#            ),
-];
+    # Empty configuration
+    my $config = {
+        identity_store          => undef,
+        log_file                => '/var/log/yubiauthd.log',
+        pid_file                => '/var/run/yubiauthd.pid',
+        authentication_sockets  => [],
+        synchronization_sockets => [],
+    };
 
-my $auth_socket = YubiAuthd::AuthenticationSocket->new(
-        socket_path     => "/tmp/yubiauth.sock",
-        identity_store  => $store
+    open(CONFIG, '<', $filename)
+        or return undef;
+
+    while (my $line = <CONFIG>) {
+        chomp($line);
+
+        # Trim comments and trailing whitespace
+        $line =~ s/\s*(?:#.*)?$//;
+
+        # Skip blank lines
+        next unless $line;
+
+        # Trim leading whitespace
+        $line =~ s/^\s*//;
+
+        if ($line =~ m/^file_store\s+([\/\.\-\w]+)/) {
+            my $store_dir = $1;
+
+            $config->{identity_store} = {
+                'class' => 'YubiAuthd::FileIdentityStore',
+                'param' => $store_dir,
+            }
+        } elsif ($line =~ m/^sqlite_store\s+([\/\.\-\w]+)/) {
+            my $db_file = $1;
+
+            $config->{identity_store} = {
+                'class' => 'YubiAuthd::SQLiteIdentityStore',
+                'param' => $db_file,
+            }
+        } elsif ($line =~ m/^log_file\s+([\/\.\-\w]+)/) {
+            $config->{log_file} = $1;
+        } elsif ($line =~ m/^pid_file\s+([\/\.\-\w]+)/) {
+            $config->{pid_file} = $1;
+        } elsif ($line =~ m/^auth_socket\s+([\/\.\-\w]+)/) {
+            my $socket_path = $1;
+
+            push(@{$config->{authentication_sockets}}, $socket_path);
+        } elsif ($line =~ m/^sync_socket\s+((?:\d{1,3}\.){3}\d{1,3}):(\d{1,5})/ ||
+                 $line =~ m/^sync_socket\s+\[([0-9a-fA-F:\.]{2,39})\]:(\d{1,5})/) {
+            my $ip_address  = $1;
+            my $port        = int($2);
+
+            push(@{$config->{synchronization_sockets}}, {
+                    'ip_address'    => $ip_address,
+                    'port'          => $port,
+                    'peers'         => [],
+                    });
+        } elsif ($line =~ m/^peer\s+((?:\d{1,3}\.){3}\d{1,3}):(\d{1,5})\s+(\S+)/ ||
+                 $line =~ m/^peer\s+\[([0-9a-fA-F:\.]{2,39})\]:(\d{1,5})\s+(\S+)/) {
+            my $ip_address  = $1;
+            my $port        = int($2);
+            my $shared_key  = $3;
+
+            # Push on to the last auth_socket's peers array ref
+            push(@{$config->{synchronization_sockets}->[-1]->{peers}}, {
+                    ip_address  => $ip_address,
+                    port        => $port,
+                    shared_key  => $shared_key,
+                    });
+        } else {
+            print STDERR "Unexpected configuration on line $.:\n$line\n";
+            return undef;
+        }
+    }
+    close(CONFIG);
+
+    return $config;
+}
+
+sub init_config($) {
+    my $config = shift;
+
+    my $id_store = $config->{identity_store}->{class}->new(
+            $config->{identity_store}->{param}
+            );
+
+    # We have to retain a reference to each of the sockets
+    # otherwise they will be cleaned up when the reference
+    # count goes to zero
+
+    my @auth_sockets = map {
+        YubiAuthd::AuthenticationSocket->new(
+                socket_path     => $_,
+                identity_store  => $id_store
+                )
+    } @{$config->{authentication_sockets}};
+
+    my @sync_sockets = map {
+        my @peers = map {
+            YubiAuthd::SynchronizationPeer->new(%{$_})
+        } @{$_->{peers}};
+
+        YubiAuthd::SynchronizationSocket->new(
+                ip_address      => $_->{ip_address},
+                port            => $_->{port},
+                peers           => \@peers,
+                identity_store  => $id_store
+                )
+    } @{$config->{synchronization_sockets}};
+
+    return (@auth_sockets, @sync_sockets);
+}
+
+sub daemonize($$) {
+    my $log_file = shift;
+    my $pid_file = shift;
+
+    chdir '/'
+        or die "Can't chdir to /: $!";
+    open STDIN, '/dev/null'
+        or die "Can't read /dev/null: $!";
+    open STDOUT, '>>' , $log_file
+        or die "Can't write to $log_file: $!";
+    open STDERR, '>>' , $log_file
+        or die "Can't write to $log_file: $!";
+    defined(my $pid = fork)
+        or die "Can't fork: $!";
+    exit if $pid;
+
+    POSIX::setsid()
+        or die "Can't start a new session: $!";
+    umask 0;
+
+    defined($pid = fork)
+        or die "Can't fork: $!";
+    exit(0) if $pid;
+
+    open PID, '>', $pid_file
+        or die "Can't open $pid_file: $!";
+
+    print PID "$$\n";
+    close PID;
+}
+
+sub main() {
+    my $config_file = '/etc/yubiauthd.conf';
+    my $foreground = '';
+
+    GetOptions(
+        'config=s' => \$config_file,
+        'foreground' => \$foreground,
         );
 
-my $sync_socket = YubiAuthd::SynchronizationSocket->new(
-        ip_address      => '::',
-        port            => 16000,
-        identity_store  => $store,
-        peers           => $peers
-        );
+    my $config = parse_config($config_file);
+    die "Unable to parse config" unless $config;
 
-print "Started!\n";
+    my @sockets = init_config($config);
 
-# Run our event loop
-AnyEvent->condvar->recv;
+    daemonize($config->{log_file}, $config->{pid_file}) unless $foreground;
+
+    # Run our event loop
+    AnyEvent->condvar->recv;
+}
+
+main();

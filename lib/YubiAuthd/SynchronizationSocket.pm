@@ -54,7 +54,7 @@ sub new($%) {
         Proto           => 'udp',
         Reuse           => 1,
         Blocking        => 0,
-    ) or carp("$class->new(): invalid socket");
+    ) or croak("$class->new(): invalid socket");
 
     my $self = {
         socket                  => $socket,
