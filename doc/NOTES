@@ -1,0 +1,32 @@
+
+Interfaces:
+
+UNIX socket
+    local authentication requests
+
+    Protocol:
+        Request: UNIX domain datagram containing the Yubikey one time password
+        Response:
+
+UDP Socket for counter synchronization
+    Protocol:
+        Notification:
+            public_id
+            counter
+            hmac
+
+
+Peers:
+    ip_address
+    shared_secret
+
+Identities:
+    public_id           CHAR(12)
+    serial_number
+    uid #private_id
+    username
+    aes_key
+    counter
+    last_valid_key
+
+
