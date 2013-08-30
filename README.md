@@ -7,9 +7,9 @@ YubiAuthd provides a means of authenticating YubiKey OTP (one time password) cha
     $ echo $?
     0
 
-The user is identified by both the YubiKey public ID and the UNIX user ID attempting authentication. The yubiauth client connects to yubiauthd over a UNIX domain socket to preform authentication, this prevents unprivilged users from accessing the keys used to validate the OTP challenge.
+The user is identified by both the YubiKey public ID and the UNIX user ID attempting authentication. The yubiauth client connects to yubiauthd over a UNIX domain socket to perform authentication, this prevents unprivilged users from accessing the keys used to validate the OTP challenge.
 
-A counter value is computed from the usage counter and timestamp fields of each OTP challenge and synchronized between systems. This synchroization is preformed over UDP and protected from forgery using HMAC. This provides robust failure tolerent counter syncronization to prevent replay attacks across multiple hosts.
+A counter value is computed from the usage counter and timestamp fields of each OTP challenge and synchronized between systems. This synchroization is performed over UDP and protected from forgery using HMAC. This provides robust failure tolerent counter syncronization to prevent replay attacks across multiple hosts.
 
 The motivation of using this approach was to create a two factor authentication system that would not depend on any external services, so it would continue to work in the event of a significant network disruption. The downside of this approach is the authentication secrets must be stored locally on each server.
 
