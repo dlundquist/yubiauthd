@@ -48,7 +48,7 @@ For new installations using the `sqlite_store` is recommended. This uses a simpl
 
 This database is automatically created when `yubiauthd` is first run, but obviously will not include your YubiKey identities. Ensure this database is only accessible by root.
 
-Ensure the the `auth_socket` directory exists and is readable by all users.
+Ensure the `auth_socket` directory exists and is readable by all users.
 
 An example syncronization peer configuration is included in `etc/yubiauthd.conf`. If in a dual stack enviornment, note the difference in behaviour of listening IPv6 sockets.
 
