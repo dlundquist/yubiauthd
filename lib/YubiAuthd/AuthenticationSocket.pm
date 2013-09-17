@@ -94,7 +94,20 @@ sub _read_cb($) {
     my ($self) = @_;
 
     my $sock = $self->{socket}->accept() or carp("read_cb: $!");
-    my ($pid, $uid, $gid) = unpack('lll', $sock->sockopt(SO_PEERCRED));
+    my $peercred = $sock->sockopt(SO_PEERCRED)
+        or croak "Unable to fetch peer credentials: $!";
+    my ($pid, $uid, $gid);
+    my $os = $^O;
+
+    if ($os eq 'linux') {
+        # Unpack struct ucred
+        ($pid, $uid, $gid) = unpack('lll', $peercred);
+    } elsif ($os eq 'openbsd') {
+        # Unpack struct sockpeercred
+        ($uid, $gid, $pid) = unpack('lll', $peercred);
+    } else {
+        croak "Unsupported OS $os";
+    }
 
     return YubiAuthd::AuthenticationSession->new($sock, $pid, $uid, $gid, $self);
 }
