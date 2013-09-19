@@ -125,9 +125,9 @@ sub notify($$) {
             );
 
     my $sock = IO::Socket::IP->new(
-            PeerHost    => $self->ip,
-            PeerService => $self->port,
-            Proto       => 'udp',
+            PeerHost => $self->ip,
+            PeerPort => $self->port,
+            Proto    => 'udp'
             ) or croak "Unable to open UDP socket:  $!";
 
     $sock->send($sync_message->payload($self->shared_key))
