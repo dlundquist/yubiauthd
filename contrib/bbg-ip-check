@@ -261,6 +261,7 @@ sub post_auth {
         $cmd = $1;
     }
 
+    closelog();
     exec($shell,"-c",$cmd);
 }
 
