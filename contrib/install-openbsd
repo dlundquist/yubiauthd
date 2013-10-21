@@ -1,0 +1,50 @@
+#!/bin/sh
+
+PREFIX=/usr/local
+
+# Install:
+# libev
+# p5-AnyEvent
+# p5-DBD-SQLite
+# p5-DBI
+# p5-Digest-HMAC
+# p5-Digest-SHA1
+# p5-EV
+# p5-common-sense (required by EV)
+
+install -d ${PREFIX}/libdata/perl5/site_perl/YubiAuthd
+install -m 0644 lib/YubiAuthd/AuthenticationChallenge.pm \
+        ${PREFIX}/libdata/perl5/site_perl/YubiAuthd/AuthenticationChallenge.pm
+install -m 0644 lib/YubiAuthd/AuthenticationSession.pm \
+        ${PREFIX}/libdata/perl5/site_perl/YubiAuthd/AuthenticationSession.pm
+install -m 0644 lib/YubiAuthd/AuthenticationSocket.pm \
+        ${PREFIX}/libdata/perl5/site_perl/YubiAuthd/AuthenticationSocket.pm
+install -m 0644 lib/YubiAuthd/FileIdentityStore.pm \
+        ${PREFIX}/libdata/perl5/site_perl/YubiAuthd/FileIdentityStore.pm
+install -m 0644 lib/YubiAuthd/Identity.pm \
+        ${PREFIX}/libdata/perl5/site_perl/YubiAuthd/Identity.pm
+install -m 0644 lib/YubiAuthd/IdentityBuilder.pm \
+        ${PREFIX}/libdata/perl5/site_perl/YubiAuthd/IdentityBuilder.pm
+install -m 0644 lib/YubiAuthd/IdentityStore.pm \
+        ${PREFIX}/libdata/perl5/site_perl/YubiAuthd/IdentityStore.pm
+install -m 0644 lib/YubiAuthd/SQLiteIdentityStore.pm \
+        ${PREFIX}/libdata/perl5/site_perl/YubiAuthd/SQLiteIdentityStore.pm
+install -m 0644 lib/YubiAuthd/SynchronizationMessage.pm \
+        ${PREFIX}/libdata/perl5/site_perl/YubiAuthd/SynchronizationMessage.pm
+install -m 0644 lib/YubiAuthd/SynchronizationPeer.pm \
+        ${PREFIX}/libdata/perl5/site_perl/YubiAuthd/SynchronizationPeer.pm
+install -m 0644 lib/YubiAuthd/SynchronizationSocket.pm \
+        ${PREFIX}/libdata/perl5/site_perl/YubiAuthd/SynchronizationSocket.pm
+install src/yubiauthd \
+        ${PREFIX}/sbin/yubiauthd
+install src/yubiauth \
+        ${PREFIX}/bin/yubiauth
+install -m 600 etc/yubiauthd.conf /etc/yubiauthd.conf
+install -m 644 etc/yubiauth.conf /etc/yubiauth.conf
+
+# OpenBSD 5.3 includes Perl 5.12 which does not have IO::Socket::IP so fall back to IO::Socket::INET
+perl -pi -e 's/IO::Socket::IP/IO::Socket::INET/g' \
+        ${PREFIX}/libdata/perl5/site_perl/YubiAuthd/SynchronizationPeer.pm \
+        ${PREFIX}/libdata/perl5/site_perl/YubiAuthd/SynchronizationSocket.pm
+
+echo "Start yubiauthd with: LD_PRELOAD=libpthread.so /usr/local/sbin/yubiauthd"
