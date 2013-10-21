@@ -148,7 +148,7 @@ sub shutdown($$) {
     $self->{client_socket}->send("DENIED\n");
     $self->{client_socket}->shutdown(2);
     $self->{watcher} = undef;
-    carp $reason;
+    carp $reason if $reason;
 
     return undef;
 }
