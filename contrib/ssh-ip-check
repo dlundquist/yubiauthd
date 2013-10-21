@@ -16,7 +16,7 @@
 # For this command to be used, the sshd_config should be updated with a line
 # like the following:
 #
-#  ForceCommand /usr/local/bin/bbg-ip-check
+#  ForceCommand /usr/local/bin/ssh-ip-check
 
 # Before anything else, we want to prevent any funny business around signals being
 # used to background or terminate this process unexpectedly.
@@ -53,7 +53,7 @@ my $skipped = {
 
 sub check_environment() {
     # Start our syslog...
-    openlog("bbg-ip-auth", "nofatal", 'authpriv');
+    openlog("ssh-ip-check", "nofatal", 'authpriv');
 
     # Set the PATH to something safe so we can exec() in taint mode
     $ENV{'PATH'} = "/usr/bin:/bin";
@@ -83,7 +83,8 @@ sub ipv6_subnet($) {
     # Fill the first half of the quad (up to the double-colon)
     my $i = 0;
     while (($i < $#quads) && ($quads[$i] ne '')) {
-        $result[$i] = $quads[$i];
+        # sprintf and hex here eliminate leading zeros.
+        $result[$i] = sprintf("%x",hex($quads[$i]));
         $i++;
     }
 
@@ -91,7 +92,8 @@ sub ipv6_subnet($) {
     my $i = $#quads;
     my $offset = 7 - $i;
     while (($i > 0) && ($quads[$i] ne '')) {
-        $result[$i + $offset] = $quads[$i];
+        # sprintf and hex here eliminate leading zeros.
+        $result[$i + $offset] = sprintf("%x",hex($quads[$i]));
         $i--;
     }
 
