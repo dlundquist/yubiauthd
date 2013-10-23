@@ -176,15 +176,18 @@ sub auth_ip_user($$) {
 
     return undef if ("" eq $code);
 
-    # Make taint checking happy...
-    if ($code =~ /^(.+)$/) {
+    # Make taint check happy, and make sure we've got something that looks like a yubicode
+    if ($code =~ m/^([cbdefghijklnrtuv]{44})$/) {
         $code = $1;
+    } else {
+        syslog('info', "$user : $ip : Yubikey authentication failure");
+        return undef;
     }
 
-    system(YUBIAUTH, $code);
+    my $sret = system(YUBIAUTH, $code);  # Need to check return value of system() call, as SIGINT gets sent to child
     my $retval = $? >> 8;
 
-    if (0 == $retval) {
+    if ((0 == $retval) && (0 == $sret)) {
         syslog('info', "$user : $ip : Successful IP authentication");
         # Cache the successful auth...
 
@@ -201,6 +204,9 @@ sub auth_ip_user($$) {
         open(AUTH,">" . $home . "/" . IPDIR . "/$ip") || syslog('warning', "$user : $ip : Unable to cache yubi auth: $!");
         close(AUTH);
         return 1;
+    } else {
+        # Log the failure
+        syslog('info', "$user : $ip : Yubikey authentication failure");
     }
 
     # If we are here, we didn't auth successfully.
