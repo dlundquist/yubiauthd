@@ -1,6 +1,6 @@
 #!/usr/bin/perl -T
 
-use Test::More tests => 6;
+use Test::More tests => 8;
 
 use File::Basename;
 use lib dirname(__FILE__) . '/../lib';
@@ -82,6 +82,9 @@ is( try_auth('vvvvvvvvvvvvgvndkrfkgclkktfftnnckctrhjdcdkid'), '', "Second use of
 is( try_auth('vvvvvvvvvvvvfrejuvtrhdgjbfdvirhnrhfdnnujdkfv'), 1, "First use of another OTP");
 is( try_auth('vvvvvvvvvvvvgvndkrfkgclkktfftnnckctrhjdcdkid'), '', "Reuse of older OTP");
 is( try_auth('iivkctnggrtiulkrvgdtnbgjnkfthbcgugvfccrflkug'), '', "Using another identities OTP");
+is( try_auth('too_short'), '', "Too short of a OTP");
+is( try_auth('vvvvvvvvvvvvlfftgeblljetvrbfgtvgfcklcgidjtdb'), 1, "First use of another OTP");
+
 
 kill $pid;
 
