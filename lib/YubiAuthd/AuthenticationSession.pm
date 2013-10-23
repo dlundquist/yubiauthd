@@ -145,7 +145,7 @@ sub _read_cb($) {
 sub shutdown($$) {
     my ($self, $reason) = @_;
 
-    $self->{client_socket}->send("DENIED\n");
+    $self->{client_socket}->send("DENIED\n") if $self->{client_socket}->connected();
     $self->{client_socket}->shutdown(2);
     $self->{watcher} = undef;
     carp $reason if $reason;
