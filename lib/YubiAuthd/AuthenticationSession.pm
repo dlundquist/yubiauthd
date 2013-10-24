@@ -145,8 +145,15 @@ sub _read_cb($) {
 sub shutdown($$) {
     my ($self, $reason) = @_;
 
-    $self->{client_socket}->send("DENIED\n") if $self->{client_socket}->connected();
-    $self->{client_socket}->shutdown(2);
+    # The client may have closed the socket so respond in an eval block
+    eval {
+        $self->{client_socket}->send("DENIED\n");
+        $self->{client_socket}->shutdown(2);
+        $self->{client_socket}->close();
+    };
+    carp(ref($self) . "->shutdown() $@") if $@;
+
+    # Stop the read callback watcher for this session
     $self->{watcher} = undef;
     carp(ref($self) . "->shutdown() $reason") if $reason;
 
