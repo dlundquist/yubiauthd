@@ -23,6 +23,7 @@ use EV;
 use AnyEvent;
 
 use lib dirname(__FILE__) . '/../lib';
+use YubiAuthd::Log;
 use YubiAuthd::FileIdentityStore;
 use YubiAuthd::SQLiteIdentityStore;
 use YubiAuthd::AuthenticationSocket;
@@ -148,6 +149,8 @@ sub daemonize($$) {
     my $log_file = shift;
     my $pid_file = shift;
 
+    openlog('yubiauthd', 'nofatal,pid', 'auth');
+
     chdir '/'
         or die "Can't chdir to /: $!";
     open STDIN, '/dev/null'
@@ -191,8 +194,16 @@ sub main() {
 
     daemonize($config->{log_file}, $config->{pid_file}) unless $foreground;
 
+    my $done = AnyEvent->condvar;
+    my $sigterm_watcher = AnyEvent->signal(
+            signal => "TERM",
+            cb     => sub { $done->send }
+            );
+
+    syslog('info', "started.");
+
     # Run our event loop
-    AnyEvent->condvar->recv;
+    $done->recv;
 }
 
 main();
