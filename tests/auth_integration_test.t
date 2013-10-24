@@ -34,13 +34,26 @@ my $auth_sock_path = tmpnam() . '.sock';
 #
 sub try_auth($) {
     my $otp = shift;
+    my $result = '';
 
-    my $sock = IO::Socket::UNIX->new($auth_sock_path)
-        or die $!;
+    my $old_sigalrm = $SIG{ALRM};
+    eval {
+        local $SIG{ALRM} = sub { die "Timed Out" };
+        alarm 3;
 
-    $sock->print($otp);
+        my $sock = IO::Socket::UNIX->new($auth_sock_path)
+            or die $!;
 
-    return $sock->getline() eq "AUTHENTICATION SUCCESSFUL\n";
+        $sock->print($otp);
+
+        $result = $sock->getline() eq "AUTHENTICATION SUCCESSFUL\n";
+
+        alarm 0;
+    };
+    print STDERR $@ if $@;
+    $SIG{ALRM} = $old_sigalrm;
+
+    return $result;
 }
 
 #
@@ -83,7 +96,7 @@ is( try_auth('vvvvvvvvvvvvfrejuvtrhdgjbfdvirhnrhfdnnujdkfv'), 1, "First use of a
 is( try_auth('vvvvvvvvvvvvgvndkrfkgclkktfftnnckctrhjdcdkid'), '', "Reuse of older OTP");
 is( try_auth('iivkctnggrtiulkrvgdtnbgjnkfthbcgugvfccrflkug'), '', "Using another identities OTP");
 is( try_auth('too_short'), '', "Too short of a OTP");
-is( try_auth('vvvvvvvvvvvvlfftgeblljetvrbfgtvgfcklcgidjtdb'), 1, "First use of another OTP");
+is( try_auth('vvvvvvvvvvvvlfftgeblljetvrbfgtvgfcklcgidjtdb'), 1, "First use of a third OTP");
 
 
 kill $pid;
