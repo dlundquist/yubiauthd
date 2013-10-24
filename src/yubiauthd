@@ -194,10 +194,16 @@ sub main() {
 
     daemonize($config->{log_file}, $config->{pid_file}) unless $foreground;
 
+    my $done = AnyEvent->condvar;
+    my $sigterm_watcher = AnyEvent->signal(
+            signal => "TERM",
+            cb     => sub { $done->send }
+            );
+
     syslog('info', "started.");
 
     # Run our event loop
-    AnyEvent->condvar->recv;
+    $done->recv;
 }
 
 main();
