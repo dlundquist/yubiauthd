@@ -94,7 +94,7 @@ sub identity_store($) {
 sub _read_cb($) {
     my ($self) = @_;
 
-    my $sock = $self->{socket}->accept() or carp("read_cb: $!");
+    my $sock = $self->{socket}->accept() or croak(ref($self) . "->_read_cb() accept: $!");
 
     # Grab the client credential info
     my $peercred = $sock->sockopt(SO_PEERCRED)
@@ -116,7 +116,7 @@ sub _read_cb($) {
     my $flags = $sock->fcntl(F_GETFL, 0);
     $sock->fcntl(F_SETFL, $flags | O_NONBLOCK);
 
-    return YubiAuthd::AuthenticationSession->new($sock, $pid, $uid, $gid, $self);
+    YubiAuthd::AuthenticationSession->new($sock, $pid, $uid, $gid, $self);
 }
 
 1;

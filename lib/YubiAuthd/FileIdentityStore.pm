@@ -51,7 +51,7 @@ sub new {
 
     my $store_dir = shift;
 
-    carp("$class->new(): invalid store_dir") unless -d $store_dir &&
+    croak("$class->new(): invalid store_dir") unless -d $store_dir &&
                                                        "$store_dir/keynums" &&
                                                        "$store_dir/keys" &&
                                                        "$store_dir/state" &&
