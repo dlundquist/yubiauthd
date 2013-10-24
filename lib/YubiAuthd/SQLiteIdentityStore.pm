@@ -75,7 +75,7 @@ sub load_by_public_id($$) {
     my $sth = $self->{db}->prepare($query);
     $sth->bind_param(1, $public_id, DBI::SQL_VARCHAR());
     $sth->execute()
-        or croak "Unable to execute statement $query: " . $sth->errstr;
+        or croak(ref($self) . "->load_by_public_id($public_id) unable to execute statement $query: " . $sth->errstr);
     my @row = $sth->fetchrow_array()
         or return undef; # no result;
 
@@ -98,7 +98,7 @@ sub load_by_username($$) {
     my $sth = $self->{db}->prepare($query);
     $sth->bind_param(1, $username, DBI::SQL_VARCHAR());
     $sth->execute()
-        or croak "Unable to execute statement $query: " . $sth->errstr;
+        or croak(ref($self) . "->load_by_username($username) unable to execute statement $query: " . $sth->errstr);
     my @row = $sth->fetchrow_array()
         or return undef; # no result;
 
@@ -125,7 +125,7 @@ sub store_identity($$) {
     $sth->bind_param(5, $identity->uid(), DBI::SQL_VARCHAR());
     $sth->bind_param(6, $identity->counter(), DBI::SQL_INTEGER());
     $sth->execute()
-        or croak "Unable to execute statement $query: " . $sth->errstr;
+        or croak(ref($self) . "->store_identity() unable to execute statement $query: " . $sth->errstr);
 }
 
 sub notify($$) {
@@ -138,7 +138,7 @@ sub notify($$) {
     $sth->bind_param(2, $identity->public_id(), DBI::SQL_VARCHAR());
     $sth->execute();
 
-    croak("Error storing Identity's new counter value: $DBI::errstr\n") if ($self->{db}->err());
+    croak(ref($self) . "->notify($identity) Error storing Identity's new counter value: $DBI::errstr\n") if ($self->{db}->err());
 
     return 1;
 }
@@ -156,7 +156,7 @@ sub _check_db($) {
                     'created_at INTEGER NOT NULL DEFAULT CURRENT_TIMESTAMP,' .
                     'updated_at INTEGER NOT NULL DEFAULT CURRENT_TIMESTAMP' .
                     ');');
-    croak("Problem creating database: $DBI::errstr\n") if ($self->{db}->err());
+    croak(ref($self) . "->_check_db() problem creating database: $DBI::errstr\n") if ($self->{db}->err());
 }
 
 1;

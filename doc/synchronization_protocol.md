@@ -40,7 +40,7 @@ Fields:
 
     Counter Value
                 The new counter value for this public identity expressed as
-                as 32bit interger in network byte order.
+                as 32bit integer in network byte order.
 
     SHA1 HMAC Digest
                 The SHA1 HMAC Digest of the shared key, public identity and

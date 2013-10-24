@@ -128,10 +128,10 @@ sub notify($$) {
             PeerHost => $self->ip,
             PeerPort => $self->port,
             Proto    => 'udp'
-            ) or croak "Unable to open UDP socket:  $!";
+            ) or croak(ref($self) . "->notify() unable to open UDP socket:  $!");
 
     $sock->send($sync_message->payload($self->shared_key))
-        or croak "Unabel to send UDP synchronization message: $!";
+        or croak(ref($self) . "->notify() unable to send UDP synchronization message: $!");
 
     $sock->shutdown(2);
 }

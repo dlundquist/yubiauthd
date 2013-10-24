@@ -1,6 +1,6 @@
 #!/usr/bin/perl -T
 
-use Test::More tests => 8;
+use Test::More tests => 1;
 
 use File::Basename;
 use lib dirname(__FILE__) . '/../lib';
@@ -34,35 +34,24 @@ my $auth_sock_path = tmpnam() . '.sock';
 #
 sub try_auth($) {
     my $otp = shift;
-    my $result = '';
 
-    my $old_sigalrm = $SIG{ALRM};
-    eval {
-        local $SIG{ALRM} = sub { die "try_auth() Timed Out" };
-        alarm 3;
+    my $sock = IO::Socket::UNIX->new($auth_sock_path)
+        or die $!;
 
-        my $sock = IO::Socket::UNIX->new($auth_sock_path)
-            or die $!;
+    $sock->print($otp);
 
-        $sock->print($otp);
+    return $sock->getline() eq "AUTHENTICATION SUCCESSFUL\n";
 
-        $result = $sock->getline() eq "AUTHENTICATION SUCCESSFUL\n";
-
-        alarm 0;
-    };
-    print STDERR $@ if $@;
-    $SIG{ALRM} = $old_sigalrm;
-
-    return $result;
+    $sock->close();
 }
 
 #
 # Start up a yubiauthd server without any synchronization peers
 #
-my $pid = fork();
-unless (defined $pid) {
+my $server_pid = fork();
+unless (defined $server_pid) {
     die "fork: $!";
-} elsif ($pid == 0) {
+} elsif ($server_pid == 0) {
     my $store = YubiAuthd::SQLiteIdentityStore->new($db_path);
 
     my $id = YubiAuthd::Identity->new(
@@ -90,19 +79,34 @@ unless (defined $pid) {
 # Wait for server to start
 sleep 2;
 
-is( try_auth('vvvvvvvvvvvvgvndkrfkgclkktfftnnckctrhjdcdkid'), 1, "First use of OTP");
-is( try_auth('vvvvvvvvvvvvgvndkrfkgclkktfftnnckctrhjdcdkid'), '', "Second use of same OTP");
-is( try_auth('vvvvvvvvvvvvfrejuvtrhdgjbfdvirhnrhfdnnujdkfv'), 1, "First use of another OTP");
-is( try_auth('vvvvvvvvvvvvgvndkrfkgclkktfftnnckctrhjdcdkid'), '', "Reuse of older OTP");
-is( try_auth('iivkctnggrtiulkrvgdtnbgjnkfthbcgugvfccrflkug'), '', "Using another identities OTP");
-is( try_auth('too_short'), '', "Too short of a OTP");
-is( try_auth('vvvvvvvvvvvvlfftgeblljetvrbfgtvgfcklcgidjtdb'), 1, "First use of a third OTP");
+my $client_pid = fork();
+unless (defined $client_pid) {
+    die "fork: $!";
+} elsif ($client_pid == 0) {
+    my $sock = IO::Socket::UNIX->new($auth_sock_path)
+        or die $!;
 
-kill $pid;
+    $sock->print("too short");
 
-is($?, 0, "Server exited successfully");
+    # This causes the socket to terminate abnormally and
+    # replicates the select invalid file descriptor error
+    kill 9, $$;
+
+    sleep 1;
+
+    $sock->close();
+
+    exit(0);
+}
+
+# Wait for child to complete
+waitpid($client_pid, 0);
+
+is ( try_auth('vvvvvvvvvvvvgvndkrfkgclkktfftnnckctrhjdcdkid'), 1, "Auth request after partial request");
+
+
+kill $server_pid;
 
 # Clean up test files
 unlink $db_path;
 unlink $auth_sock_path;
-

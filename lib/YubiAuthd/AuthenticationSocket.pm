@@ -22,6 +22,7 @@ use warnings;
 require Exporter;
 use IO::Socket::UNIX qw( SOCK_STREAM SOMAXCONN SO_PEERCRED );
 use Carp;
+use Fcntl qw(F_GETFL F_SETFL O_NONBLOCK);
 require YubiAuthd::AuthenticationSession;
 require AnyEvent;
 
@@ -93,9 +94,11 @@ sub identity_store($) {
 sub _read_cb($) {
     my ($self) = @_;
 
-    my $sock = $self->{socket}->accept() or carp("read_cb: $!");
+    my $sock = $self->{socket}->accept() or croak(ref($self) . "->_read_cb() accept: $!");
+
+    # Grab the client credential info
     my $peercred = $sock->sockopt(SO_PEERCRED)
-        or croak "Unable to fetch peer credentials: $!";
+        or croak(ref($self) . "->_read_cb() unable to fetch peer credentials: $!");
     my ($pid, $uid, $gid);
     my $os = $^O;
 
@@ -106,10 +109,14 @@ sub _read_cb($) {
         # Unpack struct sockpeercred
         ($uid, $gid, $pid) = unpack('lll', $peercred);
     } else {
-        croak "Unsupported OS $os";
+        croak(ref($self) . "->_read_cb() unsupported OS $os");
     }
 
-    return YubiAuthd::AuthenticationSession->new($sock, $pid, $uid, $gid, $self);
+    # Set client socket to nonblocking
+    my $flags = $sock->fcntl(F_GETFL, 0);
+    $sock->fcntl(F_SETFL, $flags | O_NONBLOCK);
+
+    YubiAuthd::AuthenticationSession->new($sock, $pid, $uid, $gid, $self);
 }
 
 1;

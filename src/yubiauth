@@ -67,6 +67,10 @@ sub main() {
 
     die $auth_sock . " is not a socket\n" unless -S $auth_sock;
 
+    # Set an alarm in case the server does not respond in a timely manner
+    local $SIG{ALRM} = sub { die "yubiauth: timed out" };
+    alarm 3;
+
     my $sock = IO::Socket::UNIX->new($auth_sock)
         or die "Unable to connect to " . $auth_sock . ": $!";
 
