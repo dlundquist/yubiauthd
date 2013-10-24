@@ -98,7 +98,7 @@ sub _read_cb($) {
 
     # Grab the client credential info
     my $peercred = $sock->sockopt(SO_PEERCRED)
-        or croak "Unable to fetch peer credentials: $!";
+        or croak(ref($self) . "->_read_cb() unable to fetch peer credentials: $!");
     my ($pid, $uid, $gid);
     my $os = $^O;
 
@@ -109,7 +109,7 @@ sub _read_cb($) {
         # Unpack struct sockpeercred
         ($uid, $gid, $pid) = unpack('lll', $peercred);
     } else {
-        croak "Unsupported OS $os";
+        croak(ref($self) . "->_read_cb() unsupported OS $os");
     }
 
     # Set client socket to nonblocking

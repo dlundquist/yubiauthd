@@ -85,13 +85,13 @@ sub authenticate($) {
     my ($self) = @_;
 
     my $id = $self->identity
-        or croak "Unknown identity";
+        or croak(ref($self) . "->authenticate() Unknown identity");
 
     my ($ykpid, $yksid, $ykcounter, $yktimestamp, $yksession, $ykrand, $ykcrcdec, $ykcrcok) =
         Auth::Yubikey_Decrypter::yubikey_decrypt($self->{challenge}, $id->aes_key);
 
-    croak "YubiKey CRC invalid" unless $ykcrcok;
-    croak "YubiKey UID mismatch" unless $yksid eq $id->uid;
+    croak(ref($self) . "->authenticate() YubiKey CRC invalid") unless $ykcrcok;
+    croak(ref($self) . "->authenticate() YubiKey UID mismatch") unless $yksid eq $id->uid;
 
     my $old_counter = $id->counter;
     my $new_counter = $ykcounter * 1000 + $yksession;
@@ -100,7 +100,7 @@ sub authenticate($) {
     $id->counter($new_counter);
 
     # Do not authenticate unless the counter was incremented
-    return undef unless $new_counter > $old_counter;
+    croak(ref($self) . "->authenticate() attempt to reuse old OTP") unless $new_counter > $old_counter;
 
     # Authentication Challenge successful
     return $id;

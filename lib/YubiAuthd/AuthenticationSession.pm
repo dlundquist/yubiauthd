@@ -130,12 +130,12 @@ sub _read_cb($) {
     return if ($self->remaining_challenge_bytes() > 0); # Incomplete request
 
     my $challenge_id = $self->challenge_identity()
-        or return $self->shutdown("Unable to find challenge identity");
+        or return $self->shutdown("unable to find challenge identity");
 
     my $socket_id = $self->socket_identity()
-        or return $self->shutdown("Unable to find socket identity");
+        or return $self->shutdown("unable to find socket identity");
 
-    return $self->shutdown("Socket and challenge identities do no match") unless $challenge_id->public_id eq $socket_id->public_id;
+    return $self->shutdown("socket and challenge identities do no match") unless $challenge_id->public_id eq $socket_id->public_id;
 
     $self->{client_socket}->send("AUTHENTICATION SUCCESSFUL\n");
     $self->{client_socket}->shutdown(2);
@@ -148,7 +148,7 @@ sub shutdown($$) {
     $self->{client_socket}->send("DENIED\n") if $self->{client_socket}->connected();
     $self->{client_socket}->shutdown(2);
     $self->{watcher} = undef;
-    carp $reason if $reason;
+    carp(ref($self) . "->shutdown() $reason") if $reason;
 
     return undef;
 }

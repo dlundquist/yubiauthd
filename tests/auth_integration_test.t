@@ -38,7 +38,7 @@ sub try_auth($) {
 
     my $old_sigalrm = $SIG{ALRM};
     eval {
-        local $SIG{ALRM} = sub { die "Timed Out" };
+        local $SIG{ALRM} = sub { die "try_auth() Timed Out" };
         alarm 3;
 
         my $sock = IO::Socket::UNIX->new($auth_sock_path)
@@ -91,13 +91,12 @@ unless (defined $pid) {
 sleep 2;
 
 is( try_auth('vvvvvvvvvvvvgvndkrfkgclkktfftnnckctrhjdcdkid'), 1, "First use of OTP");
-is( try_auth('vvvvvvvvvvvvgvndkrfkgclkktfftnnckctrhjdcdkid'), '', "Second use of OTP");
+is( try_auth('vvvvvvvvvvvvgvndkrfkgclkktfftnnckctrhjdcdkid'), '', "Second use of same OTP");
 is( try_auth('vvvvvvvvvvvvfrejuvtrhdgjbfdvirhnrhfdnnujdkfv'), 1, "First use of another OTP");
 is( try_auth('vvvvvvvvvvvvgvndkrfkgclkktfftnnckctrhjdcdkid'), '', "Reuse of older OTP");
 is( try_auth('iivkctnggrtiulkrvgdtnbgjnkfthbcgugvfccrflkug'), '', "Using another identities OTP");
 is( try_auth('too_short'), '', "Too short of a OTP");
 is( try_auth('vvvvvvvvvvvvlfftgeblljetvrbfgtvgfcklcgidjtdb'), 1, "First use of a third OTP");
-
 
 kill $pid;
 

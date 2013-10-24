@@ -74,14 +74,14 @@ sub load_by_public_id($$) {
 
     # First lookup the serial number with a full directory scan
     opendir(SERIAL_DIR, $self->{store_dir} . '/keynums')
-        or croak "Failed to open keynums dir";
+        or croak(ref($self) . "->load_by_public_id($public_id) failed to open keynums directory");
     while (my $filename = readdir(SERIAL_DIR)) {
         my $filepath = $self->{store_dir} . '/keynums/' . $filename;
 
         next unless -f $filepath and -r $filepath;
 
         open(SERIAL_FILE, $filepath)
-            or croak "Failed to open $filepath";
+            or croak(ref($self) . "->load_by_public_id($public_id) failed to open $filepath");
 
         if (<SERIAL_FILE> =~ m/^$public_id$/) {
             $serial_number = $filename;
@@ -101,7 +101,7 @@ sub load_by_public_id($$) {
 
     # Lookup the username with another full directory scan
     opendir(USERNAME_DIR, $self->{store_dir} . '/users')
-        or croak "Failed to open keynums dir";
+        or croak(ref($self) . "->load_by_public_id($public_id) failed to open username directory");
     while (my $username = readdir(USERNAME_DIR)) {
         my $filepath = $self->{store_dir} . '/users/' . $username;
 
@@ -116,7 +116,7 @@ sub load_by_public_id($$) {
     my $key_file = "$self->{store_dir}/keys/$public_id";
 
     open(KEY_FH, $key_file)
-        or croak("open: $!");
+        or croak(ref($self) . "->load_by_public_id($public_id) failed to open $key_file");
     my $uid = <KEY_FH>;
     chomp($uid);
     $uid =~ s/\s+//g;
@@ -192,10 +192,10 @@ sub notify($$) {
     my $state_file = $self->{store_dir} . '/state/' . $identity->public_id;
 
     open(STATE, '>', $state_file)
-        or croak "Unable to open $state_file: $!";
+        or croak(ref($self) . "->notify() failed to open $state_file");
     print STATE $identity->counter;
     close(STATE)
-        or croak "Unable to close $state_file: $!";
+        or croak(ref($self) . "->notify() failed to close $state_file");
 }
 
 1;
