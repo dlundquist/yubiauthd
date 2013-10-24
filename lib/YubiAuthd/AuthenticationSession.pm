@@ -158,7 +158,7 @@ sub shutdown($$) {
     # Stop the read callback watcher for this session
     $self->{watcher} = undef;
     if ($reason) {
-        carp(ref($self) . "->shutdown() $reason") if $reason;
+        carp(ref($self) . "->shutdown() $reason");
         syslog('info', "failed authentication by user %s (uid=%d) %s", $self->username, $self->{uid}, $reason);
     } else {
         syslog('info', "failed authentication by user %s (uid=%d)", $self->username, $self->{uid});
