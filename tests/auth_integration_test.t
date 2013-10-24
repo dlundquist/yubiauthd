@@ -1,6 +1,6 @@
 #!/usr/bin/perl -T
 
-use Test::More tests => 8;
+use Test::More tests => 10;
 
 use File::Basename;
 use lib dirname(__FILE__) . '/../lib';
@@ -57,6 +57,38 @@ sub try_auth($) {
 }
 
 #
+# A poorly behaved yubiauth client
+#
+sub incomplete_auth($) {
+    my $otp = shift;
+
+    my $client_pid = fork();
+    unless (defined $client_pid) {
+        die "fork: $!";
+    } elsif ($client_pid == 0) {
+        my $sock = IO::Socket::UNIX->new($auth_sock_path)
+            or die $!;
+
+        $sock->print($otp);
+
+        # This causes the socket to terminate abnormally and
+        # replicates the select invalid file descriptor error
+        kill(9, $$);
+
+        sleep 1;
+
+        # Should not be reached
+        $sock->close();
+        exit(0);
+    }
+    # Wait for client to complete
+    my $result = waitpid($client_pid, 0);
+
+    # Return true if the client was terminated by SIGKILL
+    return ($result == $client_pid) && (($? & 127) == 9);
+}
+
+#
 # Start up a yubiauthd server without any synchronization peers
 #
 my $pid = fork();
@@ -82,8 +114,15 @@ unless (defined $pid) {
         identity_store  => $store
     );
 
+    my $done = AnyEvent->condvar;
+
+    my $w = AnyEvent->signal(
+        signal => "TERM",
+        cb     => sub { $done->send }
+    );
+
     # Run our event loop
-    AnyEvent->condvar->recv;
+    $done->recv;
     exit(0);
 }
 
@@ -97,8 +136,12 @@ is( try_auth('vvvvvvvvvvvvgvndkrfkgclkktfftnnckctrhjdcdkid'), '', "Reuse of olde
 is( try_auth('iivkctnggrtiulkrvgdtnbgjnkfthbcgugvfccrflkug'), '', "Using another identities OTP");
 is( try_auth('too_short'), '', "Too short of a OTP");
 is( try_auth('vvvvvvvvvvvvlfftgeblljetvrbfgtvgfcklcgidjtdb'), 1, "First use of a third OTP");
+is( incomplete_auth('too_short'), 1, "Incomplete authentication session");
+is( try_auth('vvvvvvvvvvvvbhkhklvucncruneeilrbvvuilbthdrth'), 1, "First use of a fourth OTP");
 
-kill $pid;
+
+kill 'TERM', $pid;
+waitpid($pid, 0);
 
 is($?, 0, "Server exited successfully");
 
