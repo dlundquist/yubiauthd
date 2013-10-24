@@ -23,6 +23,7 @@ require Exporter;
 use Carp;
 require AnyEvent;
 require YubiAuthd::AuthenticationChallenge;
+use YubiAuthd::Log;
 use constant {
     AUTH_CHALLENGE_LENGTH => 44,
 };
@@ -73,7 +74,7 @@ sub new($$) {
 sub username($) {
     my ($self) = @_;
 
-    return getpwuid($self->{uid});
+    return scalar(getpwuid($self->{uid}));
 }
 
 sub authentication_socket($) {
@@ -140,6 +141,7 @@ sub _read_cb($) {
     $self->{client_socket}->send("AUTHENTICATION SUCCESSFUL\n");
     $self->{client_socket}->shutdown(2);
     $self->{watcher} = undef;
+    syslog('info', "successful authentication by user %s (uid=%d) with identity %s", $self->username, $self->{uid}, $challenge_id->public_id);
 }
 
 sub shutdown($$) {
@@ -155,8 +157,12 @@ sub shutdown($$) {
 
     # Stop the read callback watcher for this session
     $self->{watcher} = undef;
-    carp(ref($self) . "->shutdown() $reason") if $reason;
-
+    if ($reason) {
+        carp(ref($self) . "->shutdown() $reason") if $reason;
+        syslog('info', "failed authentication by user %s (uid=%d) %s", $self->username, $self->{uid}, $reason);
+    } else {
+        syslog('info', "failed authentication by user %s (uid=%d)", $self->username, $self->{uid});
+    }
     return undef;
 }
 
