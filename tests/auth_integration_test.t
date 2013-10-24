@@ -13,7 +13,7 @@ use YubiAuthd::Identity;
 use YubiAuthd::SQLiteIdentityStore;
 use YubiAuthd::AuthenticationSocket;
 
-# Open Time Passwords for this test YubiKey:
+# One Time Passwords for this test YubiKey:
 #
 #    vvvvvvvvvvvvgvndkrfkgclkktfftnnckctrhjdcdkid
 #    vvvvvvvvvvvvfrejuvtrhdgjbfdvirhnrhfdnnujdkfv
