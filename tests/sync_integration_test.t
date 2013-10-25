@@ -1,6 +1,6 @@
 #!/usr/bin/perl -T
 
-use Test::More tests => 16;
+use Test::More tests => 18;
 
 use warnings;
 use strict;
@@ -73,11 +73,14 @@ sub send_sync_message {
     my ($port, $counter, %params) = @_;
     my $source_ip   = $params{source_ip} || '127.0.0.1';
     my $key         = $params{shared_key} || $shared_key;
+    my $public_id   = $params{public_id} || 'vvvvvvvvvvvv';
 
     my $sync_message = YubiAuthd::SynchronizationMessage->new(
-            public_id => 'vvvvvvvvvvvv',
-            counter => $counter
+            public_id   => $public_id,
+            counter     => $counter
             );
+
+    print "public_id: $public_id, counter: $counter\n";
 
     my $sock = IO::Socket::IP->new(
             PeerHost    => '127.0.0.1',
@@ -169,6 +172,9 @@ assert_counter_value(600, "should not accept updates from unknown peers");
 send_sync_message($test_servers->[0]->{sync_port}, 800, shared_key => 'xxxxxxxxxxxxxxxxxxxx');
 sleep 1;
 assert_counter_value(600, "should not accept updates with different shared keys");
+send_sync_message($test_servers->[0]->{sync_port}, 850, public_id => 'cccccccccccc');
+sleep 1;
+assert_counter_value(600, "should not ignore update from an unknown public_id");
 send_sync_message($test_servers->[0]->{sync_port}, 900);
 sleep 1;
 assert_counter_value(900, "should still accept valid updates after receiving junk");
