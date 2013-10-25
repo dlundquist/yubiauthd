@@ -14,32 +14,17 @@
 # limitations under the License.
 #
 package YubiAuthd::Log;
+use parent 'Sys::Syslog';
 
 use 5.010000;
 use strict;
 use warnings;
-
-require Exporter;
-require Sys::Syslog;
 require POSIX;
 use Carp;
 
-our @ISA = qw(Exporter);
-
-# Items to export into callers namespace by default. Note: do not export
-# names by default without a very good reason. Use EXPORT_OK instead.
-# Do not simply export all your public functions/methods/constants.
-
-# This allows declaration use YubiAuthd::Log ':all';
-# If you do not need this, moving things directly into @EXPORT or @EXPORT_OK
-# will save memory.
-our %EXPORT_TAGS = ( 'all' => [ qw(
-    closelog openlog syslog
-) ] );
-
-our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
-
-our @EXPORT = qw( closelog openlog syslog );
+our %EXPORT_TAGS = %Sys::Syslog::EXPORT_TAGS;
+our @EXPORT = @Sys::Syslog::EXPORT;
+our @EXPORT_OK = @Sys::Syslog::EXPORT_OK;
 
 our $VERSION = '0.01';
 
@@ -48,18 +33,18 @@ my $syslog_active = undef;
 sub closelog {
     if ($syslog_active) {
         $syslog_active = undef;
-        return Sys::Syslog->closelog;
+        return Sys::Syslog::closelog(@_);
     }
 }
 
 sub openlog {
     $syslog_active = 1;
-    return Sys::Syslog->openlog(@_);
+    return Sys::Syslog::openlog(@_);
 }
 
 sub syslog {
     if ($syslog_active) {
-        return Sys::Syslog->syslog(@_);
+        return Sys::Syslog::syslog(@_);
     } else {
         my $priority = shift @_;
         my $msg = shift @_;
