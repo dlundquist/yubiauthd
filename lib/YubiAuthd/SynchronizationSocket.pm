@@ -26,6 +26,7 @@ require AnyEvent;
 require YubiAuthd::IdentityStore;
 require YubiAuthd::SynchronizationMessage;
 use Carp;
+use YubiAuthd::Log;
 
 
 our @ISA = qw(Exporter);
@@ -128,6 +129,7 @@ sub _read_cb($) {
 
     eval {
         my $peer = $self->_lookup_peer($ip);
+        # quietly ignore datagrams from unknown hosts
         return unless $peer;
 
         my $sync_msg = YubiAuthd::SynchronizationMessage->new(
@@ -135,12 +137,19 @@ sub _read_cb($) {
                 key     => $peer->shared_key
                 );
 
-        my $id = $self->{identity_store}->load_by_public_id($sync_msg->public_id)
-            or croak(ref($self) . "->_read_cb() received counter synchronization message for unknown identity: " . $sync_msg->public_id);
+        my $id = $self->{identity_store}->load_by_public_id($sync_msg->public_id);
+        unless ($id) {
+            syslog('notice', "received synchronization message from %s:%d for unknown public id %s", $ip, $port, $sync_msg->public_id);
+            croak(ref($self) . "->_read_cb() received counter synchronization message for unknown identity: " . $sync_msg->public_id);
+        }
 
         $id->counter($sync_msg->counter);
+        syslog('debug', "recieved synchronization message from %s:%d for %s (%s)", $ip, $port, $sync_msg->public_id, $id->username);
     };
-    carp $@ if ($@);
+    if ($@) {
+        carp $@;
+        syslog('notice', "received invalid synchronization message from %s:%d", $ip, $port);
+    }
 }
 
 1;
