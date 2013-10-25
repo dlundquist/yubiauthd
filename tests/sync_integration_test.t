@@ -1,6 +1,6 @@
 #!/usr/bin/perl -T
 
-use Test::More tests => 14;
+use Test::More tests => 16;
 
 use warnings;
 use strict;
@@ -155,7 +155,7 @@ sub check_counter {
 
 # Wait for server to start
 sleep 1;
-check_counter(0, "should start at one");
+check_counter(0, "should start at zero");
 send_sync($test_servers->[0]->{sync_port}, 500);
 sleep 1;
 check_counter(500, "should increment when first server is updated");
@@ -171,6 +171,9 @@ check_counter(600, "should not accept updates from unknown peers");
 send_sync($test_servers->[0]->{sync_port}, 800, '127.0.0.1', 'xxxxxxxxxxxxxxxxxxxx');
 sleep 1;
 check_counter(600, "should not accept updates with different shared keys");
+send_sync($test_servers->[0]->{sync_port}, 900);
+sleep 1;
+check_counter(900, "shoudl still accept valid updates after receiving junk");
 
 
 foreach my $server (@{$test_servers}) {
