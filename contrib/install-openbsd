@@ -27,6 +27,8 @@ install -m 0644 lib/YubiAuthd/IdentityBuilder.pm \
         ${PREFIX}/libdata/perl5/site_perl/YubiAuthd/IdentityBuilder.pm
 install -m 0644 lib/YubiAuthd/IdentityStore.pm \
         ${PREFIX}/libdata/perl5/site_perl/YubiAuthd/IdentityStore.pm
+install -m 0644 lib/YubiAuthd/Log.pm \
+        ${PREFIX}/libdata/perl5/site_perl/YubiAuthd/Log.pm
 install -m 0644 lib/YubiAuthd/SQLiteIdentityStore.pm \
         ${PREFIX}/libdata/perl5/site_perl/YubiAuthd/SQLiteIdentityStore.pm
 install -m 0644 lib/YubiAuthd/SynchronizationMessage.pm \
@@ -39,8 +41,11 @@ install src/yubiauthd \
         ${PREFIX}/sbin/yubiauthd
 install src/yubiauth \
         ${PREFIX}/bin/yubiauth
-install -m 600 etc/yubiauthd.conf /etc/yubiauthd.conf
-install -m 644 etc/yubiauth.conf /etc/yubiauth.conf
+# Do not overwrite existing configuration files
+test -e /etc/yubiauthd.conf || \
+    install -m 600 etc/yubiauthd.conf /etc/yubiauthd.conf
+test -e /etc/yubiauth.conf || \
+    install -m 644 etc/yubiauth.conf /etc/yubiauth.conf
 
 # OpenBSD 5.3 includes Perl 5.12 which does not have IO::Socket::IP so fall back to IO::Socket::INET
 perl -pi -e 's/IO::Socket::IP/IO::Socket::INET/g' \
