@@ -7,18 +7,15 @@ use strict;
 use File::Basename;
 use lib dirname(__FILE__) . '/../lib';
 use File::Temp;
-use IO::Socket::UNIX qw( SOCK_STREAM );
-use Data::Dumper;
-
+use IO::Socket::IP;
+use Socket;
+use DBI;
+use Carp;
 use AnyEvent;
 use YubiAuthd::Identity;
 use YubiAuthd::SQLiteIdentityStore;
 use YubiAuthd::SynchronizationSocket;
 use YubiAuthd::SynchronizationPeer;
-use IO::Socket::IP;
-use Socket;
-use DBI;
-use Carp;
 
 my $shared_key = '7P3ycZeLdgGNkh4B89u2TC1J';
 
@@ -72,35 +69,10 @@ sub start_sync_server {
     return $pid;
 }
 
-my $test_servers = [
-    {
-        name        => 'first',
-        db_path     => tmpnam() . '.sqlite',
-        sync_port   => 8715,
-        peer_port   => 8447,
-        pid         => undef
-    },
-    {
-        name        => 'second',
-        db_path     => tmpnam() . '.sqlite',
-        sync_port   => 8447,
-        peer_port   => 8715,
-        pid         => undef
-    }
-];
-
-foreach my $server (@{$test_servers}) {
-    $server->{pid} = start_sync_server(
-            $server->{sync_port},
-            $server->{db_path},
-            $server->{peer_port});
-}
-
-sub send_sync {
-    my $port = shift;
-    my $counter = shift;
-    my $source_ip = shift || '127.0.0.1';
-    my $key = shift || $shared_key;
+sub send_sync_message {
+    my ($port, $counter, %params) = @_;
+    my $source_ip   = $params{source_ip} || '127.0.0.1';
+    my $key         = $params{shared_key} || $shared_key;
 
     my $sync_message = YubiAuthd::SynchronizationMessage->new(
             public_id => 'vvvvvvvvvvvv',
@@ -135,7 +107,24 @@ sub external_ip {
     return $ip;
 }
 
-sub check_counter {
+my $test_servers = [
+    {
+        name        => 'first',
+        db_path     => tmpnam() . '.sqlite',
+        sync_port   => 8715,
+        peer_port   => 8447,
+        pid         => undef
+    },
+    {
+        name        => 'second',
+        db_path     => tmpnam() . '.sqlite',
+        sync_port   => 8447,
+        peer_port   => 8715,
+        pid         => undef
+    }
+];
+
+sub assert_counter_value {
     my ($expected_counter, $test_msg) = @_;
 
     foreach my $server (@{$test_servers}) {
@@ -154,28 +143,35 @@ sub check_counter {
     }
 }
 
+# Start our test servers
+foreach my $server (@{$test_servers}) {
+    $server->{pid} = start_sync_server(
+            $server->{sync_port},
+            $server->{db_path},
+            $server->{peer_port});
+}
 
 # Wait for server to start
 sleep 1;
-check_counter(0, "should start at zero");
-send_sync($test_servers->[0]->{sync_port}, 500);
+assert_counter_value(0, "should start at zero");
+send_sync_message($test_servers->[0]->{sync_port}, 500);
 sleep 1;
-check_counter(500, "should increment when first server is updated");
-send_sync($test_servers->[1]->{sync_port}, 600);
+assert_counter_value(500, "should increment when first server is updated");
+send_sync_message($test_servers->[1]->{sync_port}, 600);
 sleep 1;
-check_counter(600, "should increment when second server is updated");
-send_sync($test_servers->[0]->{sync_port}, 300);
+assert_counter_value(600, "should increment when second server is updated");
+send_sync_message($test_servers->[0]->{sync_port}, 300);
 sleep 1;
-check_counter(600, "should not decrease");
-send_sync($test_servers->[0]->{sync_port}, 700, external_ip());
+assert_counter_value(600, "should not decrease");
+send_sync_message($test_servers->[0]->{sync_port}, 700, source_ip => external_ip());
 sleep 1;
-check_counter(600, "should not accept updates from unknown peers");
-send_sync($test_servers->[0]->{sync_port}, 800, '127.0.0.1', 'xxxxxxxxxxxxxxxxxxxx');
+assert_counter_value(600, "should not accept updates from unknown peers");
+send_sync_message($test_servers->[0]->{sync_port}, 800, shared_key => 'xxxxxxxxxxxxxxxxxxxx');
 sleep 1;
-check_counter(600, "should not accept updates with different shared keys");
-send_sync($test_servers->[0]->{sync_port}, 900);
+assert_counter_value(600, "should not accept updates with different shared keys");
+send_sync_message($test_servers->[0]->{sync_port}, 900);
 sleep 1;
-check_counter(900, "should still accept valid updates after receiving junk");
+assert_counter_value(900, "should still accept valid updates after receiving junk");
 
 
 foreach my $server (@{$test_servers}) {
