@@ -50,9 +50,9 @@ sub start_sync_server {
                 ip_address      => '127.0.0.1',
                 port            => $sync_port,
                 peers           => [ YubiAuthd::SynchronizationPeer->new(
-                    ip_address => '127.0.0.1',
-                    port => $peer_port,
-                    shared_key => $shared_key
+                    ip_address  => '127.0.0.1',
+                    port        => $peer_port,
+                    shared_key  => $shared_key
                     )],
                 identity_store  => $store
                 );
@@ -74,12 +74,14 @@ sub start_sync_server {
 
 my $test_servers = [
     {
+        name        => 'first',
         db_path     => tmpnam() . '.sqlite',
         sync_port   => 8715,
         peer_port   => 8447,
         pid         => undef
     },
     {
+        name        => 'second',
         db_path     => tmpnam() . '.sqlite',
         sync_port   => 8447,
         peer_port   => 8715,
@@ -148,7 +150,7 @@ sub check_counter {
         my @row = $sth->fetchrow_array()
             or die "Identity not present";
 
-        is($row[0], $expected_counter, $test_msg);
+        is($row[0], $expected_counter, $server->{name} . " server " . $test_msg);
     }
 }
 
@@ -173,12 +175,12 @@ sleep 1;
 check_counter(600, "should not accept updates with different shared keys");
 send_sync($test_servers->[0]->{sync_port}, 900);
 sleep 1;
-check_counter(900, "shoudl still accept valid updates after receiving junk");
+check_counter(900, "should still accept valid updates after receiving junk");
 
 
 foreach my $server (@{$test_servers}) {
     kill 'TERM', $server->{pid};
     waitpid($server->{pid}, 0);
     unlink($server->{db_path});
-    is($?, 0, "Server exited successfully");
+    is($?, 0, $server->{name} . " server should exit successfully");
 }
