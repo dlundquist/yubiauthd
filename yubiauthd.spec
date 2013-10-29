@@ -40,6 +40,7 @@ for FILE in AuthenticationChallenge.pm \
         IdentityBuilder.pm \
         Identity.pm \
         IdentityStore.pm \
+        Log.pm \
         SQLiteIdentityStore.pm \
         SynchronizationMessage.pm \
         SynchronizationPeer.pm \
@@ -60,6 +61,7 @@ done
 %{perl_vendorlib}/YubiAuthd/IdentityBuilder.pm
 %{perl_vendorlib}/YubiAuthd/Identity.pm
 %{perl_vendorlib}/YubiAuthd/IdentityStore.pm
+%{perl_vendorlib}/YubiAuthd/Log.pm
 %{perl_vendorlib}/YubiAuthd/SQLiteIdentityStore.pm
 %{perl_vendorlib}/YubiAuthd/SynchronizationMessage.pm
 %{perl_vendorlib}/YubiAuthd/SynchronizationPeer.pm
