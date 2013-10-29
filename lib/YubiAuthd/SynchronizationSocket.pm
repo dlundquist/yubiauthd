@@ -65,11 +65,11 @@ sub new($%) {
     }
 
     my $socket = IO::Socket::IP->new(
-        LocalHost       => $ip,
-        LocalService    => $port,
-        Proto           => 'udp',
-        Reuse           => 1,
-        Blocking        => 0,
+        LocalHost => $ip,
+        LocalPort => $port,
+        Proto     => 'udp',
+        Reuse     => 1,
+        Blocking  => 0,
     ) or croak("$class->new(): invalid socket");
 
     my $self = {
