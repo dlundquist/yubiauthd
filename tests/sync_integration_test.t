@@ -80,8 +80,6 @@ sub send_sync_message {
             counter     => $counter
             );
 
-    print "public_id: $public_id, counter: $counter\n";
-
     my $sock = IO::Socket::IP->new(
             PeerHost    => '127.0.0.1',
             PeerPort    => $port,
