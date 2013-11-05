@@ -1,0 +1,135 @@
+#!/usr/bin/perl -T
+
+use strict;
+use warnings;
+use File::Basename;
+use Auth::Yubikey_Decrypter;
+
+use lib dirname(__FILE__) . '/../lib';
+use YubiAuthd::Identity;
+use YubiAuthd::IdentityBuilder;
+use YubiAuthd::FileIdentityStore;
+use YubiAuthd::SQLiteIdentityStore;
+
+#
+# $ yubiauthadmin list
+# Public ID     Username    Serial No.  Created     Updated
+# =========     ========    ==========  =======     =======
+# vvvvvvvvvvvv  jdoe        1466182     2013-08-04  2013-11-01
+#
+#
+# $ yubiauthadmin disable user jdoe
+#
+#
+# $ yubiauthadmin disable key vvvvvvvvvvvv
+#
+#
+# $ yubiauthadmin disable key 1466182
+#
+#
+# $ yubiauthadmin add bfjnhgdhgrubvvbcnuifndhdtgdungfkbklikvgbculh
+# Remove the YubiKey and reinsert it while holding the button, continue to
+# hold the button for 5 seconds then release to enter the serial number.
+# Enter serial number: ....
+# Enter username: ....
+# Enter AES key: ....
+# AES key accepted. UID: ...., Counter: ....
+# Storing new YubiAuthd identity...Done.
+#
+
+sub load_config {
+    # TODO parse /etc/yubiauthd.conf for identity store
+    return YubiAuthd::SQLiteIdentityStore->new('test-yubiauthd.sqlite');
+}
+
+sub usage {
+    my $context = shift;
+    print STDERR "yubiauthadmin <action> <argumments>\n" .
+                 "Actions:\n" .
+                 "\tlist - lists the yubiauth identities\n".
+                 "\tdisable\n" .
+                 "\tadd\n";
+
+    exit 1;
+}
+
+sub valid_key($$;) {
+    my ($id, $otp) = @_;
+
+    eval {
+        my ($ykpid, $yksid, $ykcounter, $yktimestamp, $yksession, $ykrand, $ykcrcdec, $ykcrcok) =
+            Auth::Yubikey_Decrypter::yubikey_decrypt($otp, $id->aes_key);
+
+        return undef unless $ykcrcok;
+
+        $id->uid($yksid);
+        $id->counter($ykcounter * 1000 + $yksession);
+    };
+    return !$@;
+}
+
+sub add_identity {
+    my $store = shift;
+    my $otp = shift;
+
+    my $id = YubiAuthd::IdentityBuilder->new($store);
+
+    usage('add') unless ($otp =~ m/([cbdefghijklnrtuv]{12})[cbdefghijklnrtuv]{32}/);
+    $id->public_id($1);
+
+    print "Remove the YubiKey and reinsert it while holding the button, continue to\n" .
+          "hold the button for 5 seconds then release to enter the serial number.\n";
+
+    # Disable buffering on STDOUT
+    my $old_fh = select(STDOUT);
+    $| = 1;
+    select($old_fh);
+
+    until ($id->serial_number && $id->serial_number =~ /^\d{10}$/) {
+        print "Enter Serial Number: ";
+        my $input = <STDIN>;
+        chomp($input);
+        $id->serial_number($input);
+    }
+
+    until ($id->username && getpwnam($id->username)) {
+        print "Enter username: ";
+        my $input = <STDIN>;
+        chomp($input);
+        $id->username($input);
+    }
+
+    until ($id->aes_key && valid_key($id, $otp)) {
+        print "Enter AES key: ";
+        my $input = <STDIN>;
+        chomp($input);
+        $id->aes_key($input);
+    };
+
+    print "AES key accepted. UID: " . $id->uid . ", Counter: " . $id->counter . "\n";
+
+    my $identity = $id->build;
+
+    print "Storing new YubiAuthd identitity...";
+    $store->store_identity($identity);
+
+    print "Done\n";
+}
+
+sub main {
+    my $actions = {
+        add => \&add_identity,
+        disable => \&disable_identity,
+        list => \&list_identities,
+    };
+    my ($action, @args) = @ARGV;
+
+    usage() unless defined $actions->{$action};
+
+    my $store = load_config();
+
+    $actions->{$action}->($store, @args);
+    exit 0;
+}
+
+main();
