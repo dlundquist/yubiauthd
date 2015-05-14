@@ -241,8 +241,8 @@ sub get_ip {
 # Prints the motd without having to spawn an external process.
 sub print_motd {
     open (MOTD, "</etc/motd") || syslog('warning', "Could not print /etc/motd: $!");
-    while (<MOTD>) {
-        print;
+    while (my $line = <MOTD>) {
+        print $line;
     }
     close(MOTD);
 }
@@ -250,6 +250,19 @@ sub print_motd {
 # This takes care of "doing the right thing" after a successful authentication
 sub post_auth {
     my $cmd = $ENV{'SSH_ORIGINAL_COMMAND'};
+
+    # Allow an additional access control filter be specified as a
+    # ssh-ip-check argument
+    if (@ARGV) {
+        $cmd = shift @ARGV;
+        # Make taint checking happy.
+        if ($cmd =~ /^(.+)$/) {
+            $cmd = $1;
+        }
+        closelog();
+        exec($cmd, @ARGV);
+        die("exec($cmd) failed: $!";
+    }
 
     my $shell;
     # Make taint checking happy...
@@ -262,6 +275,7 @@ sub post_auth {
         print_motd();
         closelog();
         exec($shell,"-l");
+        die("exec($shell) failed: $!";
     }
 
     # Make taint checking happy.  Blindly accept any commands the user typed.
@@ -271,6 +285,7 @@ sub post_auth {
 
     closelog();
     exec($shell,"-c",$cmd);
+    die("exec($shell -c $cmd) failed: $!";
 }
 
 sub main {
