@@ -2,6 +2,7 @@
 
 use strict;
 use warnings;
+use Getopt::Long;
 use File::Basename;
 use Auth::Yubikey_Decrypter;
 
@@ -37,9 +38,45 @@ use YubiAuthd::SQLiteIdentityStore;
 # Storing new YubiAuthd identity...Done.
 #
 
-sub load_config {
-    # TODO parse /etc/yubiauthd.conf for identity store
-    return YubiAuthd::SQLiteIdentityStore->new('test-yubiauthd.sqlite');
+sub open_store {
+    my $filename = shift;
+
+    my $identity_store = undef;
+
+    open(CONFIG, '<', $filename)
+        or return undef;
+
+    while (my $line = <CONFIG>) {
+        chomp($line);
+
+        # Trim comments and trailing whitespace
+        $line =~ s/\s*(?:#.*)?$//;
+
+        # Skip blank lines
+        next unless $line;
+
+        # Trim leading whitespace
+        $line =~ s/^\s*//;
+
+        if ($line =~ m/^file_store\s+([\/\.\-\w]+)/) {
+            my $store_dir = $1;
+
+            $identity_store = {
+                'class' => 'YubiAuthd::FileIdentityStore',
+                'param' => $store_dir,
+            }
+        } elsif ($line =~ m/^sqlite_store\s+([\/\.\-\w]+)/) {
+            my $db_file = $1;
+
+            $identity_store = {
+                'class' => 'YubiAuthd::SQLiteIdentityStore',
+                'param' => $db_file,
+            }
+        }
+    }
+    close(CONFIG);
+
+    return $identity_store->{class}->new($identity_store->{param});
 }
 
 sub usage {
@@ -133,17 +170,25 @@ sub list_identities {
 }
 
 sub main {
+    my $config_file = '/etc/yubiauthd.conf';
+
+    GetOptions(
+        'config=s' => \$config_file,
+        ) or usage();
+
+    my $action = shift @ARGV or usage();
+
     my $actions = {
         add => \&add_identity,
         list => \&list_identities,
     };
-    my ($action, @args) = @ARGV;
 
     usage() unless defined $actions->{$action};
 
-    my $store = load_config();
+    my $store = open_store($config_file)
+        or die("Unable to open identity store");
 
-    $actions->{$action}->($store, @args);
+    $actions->{$action}->($store, @ARGV);
     exit 0;
 }
 
