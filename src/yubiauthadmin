@@ -1,0 +1,195 @@
+#!/usr/bin/perl -T
+
+use strict;
+use warnings;
+use Getopt::Long;
+use File::Basename;
+use Auth::Yubikey_Decrypter;
+
+use lib dirname(__FILE__) . '/../lib';
+use YubiAuthd::Identity;
+use YubiAuthd::IdentityBuilder;
+use YubiAuthd::FileIdentityStore;
+use YubiAuthd::SQLiteIdentityStore;
+
+#
+# $ yubiauthadmin list
+# Public ID     Username    Serial No.  Created     Updated
+# =========     ========    ==========  =======     =======
+# vvvvvvvvvvvv  jdoe        1466182     2013-08-04  2013-11-01
+#
+#
+# $ yubiauthadmin disable user jdoe
+#
+#
+# $ yubiauthadmin disable key vvvvvvvvvvvv
+#
+#
+# $ yubiauthadmin disable key 1466182
+#
+#
+# $ yubiauthadmin add bfjnhgdhgrubvvbcnuifndhdtgdungfkbklikvgbculh
+# Remove the YubiKey and reinsert it while holding the button, continue to
+# hold the button for 5 seconds then release to enter the serial number.
+# Enter serial number: ....
+# Enter username: ....
+# Enter AES key: ....
+# AES key accepted. UID: ...., Counter: ....
+# Storing new YubiAuthd identity...Done.
+#
+
+sub open_store {
+    my $filename = shift;
+
+    my $identity_store = undef;
+
+    open(CONFIG, '<', $filename)
+        or return undef;
+
+    while (my $line = <CONFIG>) {
+        chomp($line);
+
+        # Trim comments and trailing whitespace
+        $line =~ s/\s*(?:#.*)?$//;
+
+        # Skip blank lines
+        next unless $line;
+
+        # Trim leading whitespace
+        $line =~ s/^\s*//;
+
+        if ($line =~ m/^file_store\s+([\/\.\-\w]+)/) {
+            my $store_dir = $1;
+
+            $identity_store = {
+                'class' => 'YubiAuthd::FileIdentityStore',
+                'param' => $store_dir,
+            }
+        } elsif ($line =~ m/^sqlite_store\s+([\/\.\-\w]+)/) {
+            my $db_file = $1;
+
+            $identity_store = {
+                'class' => 'YubiAuthd::SQLiteIdentityStore',
+                'param' => $db_file,
+            }
+        }
+    }
+    close(CONFIG);
+
+    return $identity_store->{class}->new($identity_store->{param});
+}
+
+sub usage {
+    my $context = shift;
+    print STDERR "yubiauthadmin <action> <arguments>\n" .
+                 "Actions:\n" .
+                 "\tlist - lists the yubiauth identities\n".
+                 "\tadd\n";
+
+    exit 1;
+}
+
+sub valid_key($$;) {
+    my ($id, $otp) = @_;
+
+    eval {
+        my ($ykpid, $yksid, $ykcounter, $yktimestamp, $yksession, $ykrand, $ykcrcdec, $ykcrcok) =
+            Auth::Yubikey_Decrypter::yubikey_decrypt($otp, $id->aes_key);
+
+        return undef unless $ykcrcok;
+
+        $id->uid($yksid);
+        $id->counter($ykcounter * 1000 + $yksession);
+    };
+    return !$@;
+}
+
+sub add_identity {
+    my $store = shift;
+    my $otp = shift;
+
+    usage('add') unless ($otp && $otp =~ m/([cbdefghijklnrtuv]{12})[cbdefghijklnrtuv]{32}/);
+
+    my $id = YubiAuthd::IdentityBuilder->new($store);
+    $id->public_id($1);
+
+    print "Remove the YubiKey and reinsert it while holding the button, continue to\n" .
+          "hold the button for 5 seconds then release to enter the serial number.\n";
+
+    # Disable buffering on STDOUT
+    my $old_fh = select(STDOUT);
+    $| = 1;
+    select($old_fh);
+
+    until ($id->serial_number && $id->serial_number =~ /^\d{10}$/) {
+        print "Enter Serial Number: ";
+        my $input = <STDIN>;
+        chomp($input);
+        $id->serial_number($input);
+    }
+
+    until ($id->username && getpwnam($id->username)) {
+        print "Enter username: ";
+        my $input = <STDIN>;
+        chomp($input);
+        $id->username($input);
+    }
+
+    until ($id->aes_key && valid_key($id, $otp)) {
+        print "Enter AES key: ";
+        my $input = <STDIN>;
+        chomp($input);
+        $id->aes_key($input);
+    };
+
+    print "AES key accepted. UID: " . $id->uid . ", Counter: " . $id->counter . "\n";
+
+    my $identity = $id->build;
+
+    print "Storing new YubiAuthd identitity...";
+    $store->store_identity($identity);
+
+    print "Done\n";
+}
+
+sub list_identities {
+    my $store = shift;
+
+    print "Public ID     Username          Serial No.  Created     Updated\n" .
+          "============  ================  ==========  ==========  ==========\n";
+
+    foreach my $id ($store->enumerate) {
+        printf("%12s  %-19s %8d  %-11s %-11s\n",
+               $id->public_id,
+               $id->username,
+               $id->serial_number,
+               (split /\s+/, $id->created_at)[0],
+               (split /\s+/, $id->updated_at)[0]);
+
+    }
+}
+
+sub main {
+    my $config_file = '/etc/yubiauthd.conf';
+
+    GetOptions(
+        'config=s' => \$config_file,
+        ) or usage();
+
+    my $action = shift @ARGV or usage();
+
+    my $actions = {
+        add => \&add_identity,
+        list => \&list_identities,
+    };
+
+    usage() unless defined $actions->{$action};
+
+    my $store = open_store($config_file)
+        or die("Unable to open identity store");
+
+    $actions->{$action}->($store, @ARGV);
+    exit 0;
+}
+
+main();

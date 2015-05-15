@@ -65,62 +65,94 @@ sub build($) {
     my $self = shift;
 
     return YubiAuthd::Identity->new(
-        public_id       => $self->{public_id},
-        serial_number   => $self->{serial_number},
-        username        => $self->{username},
-        aes_key         => $self->{aes_key},
-        uid             => $self->{uid},
-        counter         => $self->{counter},
-        identity_store  => $self->{identity_store}
+        public_id       => $self->public_id,
+        serial_number   => $self->serial_number,
+        username        => $self->username,
+        aes_key         => $self->aes_key,
+        uid             => $self->uid,
+        counter         => $self->counter,
+        updated_at      => $self->updated_at,
+        created_at      => $self->created_at,
+        identity_store  => $self->identity_store
     );
 }
 
-sub public_id($$) {
-    my ($self, $public_id) = @_;
+sub public_id {
+    my $self = shift;
+    my $public_id = shift;
 
-    $self->{public_id} = $public_id;
+    $self->{public_id} = $public_id if defined $public_id;
 
-    return $self;
+    return $self->{public_id};
 }
 
-sub serial_number($$) {
-    my ($self, $serial_number) = @_;
+sub serial_number {
+    my $self = shift;
+    my $serial_number = shift;
 
-    $self->{serial_number} = $serial_number;
+    $self->{serial_number} = $serial_number if defined $serial_number;
 
-    return $self;
+    return $self->{serial_number};
 }
 
-sub username($$) {
-    my ($self, $username) = @_;
+sub username {
+    my $self = shift;
+    my $username = shift;
 
-    $self->{username} = $username;
+    $self->{username} = $username if defined $username;
 
-    return $self;
+    return $self->{username};
 }
 
-sub aes_key($$) {
-    my ($self, $aes_key) = @_;
+sub aes_key {
+    my $self = shift;
+    my $aes_key = shift;
 
-    $self->{aes_key} = $aes_key;
+    $self->{aes_key} = $aes_key if defined $aes_key;
 
-    return $self;
+    return $self->{aes_key};
 }
 
-sub uid($$) {
-    my ($self, $uid) = @_;
+sub uid {
+    my $self = shift;
+    my $uid = shift;
 
-    $self->{uid} = $uid;
+    $self->{uid} = $uid if defined $uid;
 
-    return $self;
+    return $self->{uid};
 }
 
-sub counter($$) {
-    my ($self, $counter) = @_;
+sub counter {
+    my $self = shift;
+    my $counter = shift;
 
-    $self->{counter} = $counter;
+    $self->{counter} = $counter if defined $counter;
 
-    return $self;
+    return $self->{counter};
+}
+
+sub created_at {
+    my $self = shift;
+    my $created_at = shift;
+
+    $self->{created_at} = $created_at if defined $created_at;
+
+    return $self->{created_at};
+}
+
+sub updated_at {
+    my $self = shift;
+    my $updated_at = shift;
+
+    $self->{updated_at} = $updated_at if defined $updated_at;
+
+    return $self->{updated_at};
+}
+
+sub identity_store {
+    my $self = shift;
+
+    return $self->{identity_store};
 }
 
 1;
