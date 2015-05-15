@@ -70,7 +70,7 @@ sub new {
 sub load_by_public_id($$) {
     my ($self, $public_id) = @_;
 
-    my $query = 'SELECT public_id, serial_number, username, aes_key, uid, counter FROM identities WHERE public_id=?';
+    my $query = 'SELECT public_id, serial_number, username, aes_key, uid, counter, created_at, updated_at FROM identities WHERE public_id=?';
 
     my $sth = $self->{db}->prepare($query);
     $sth->bind_param(1, $public_id, DBI::SQL_VARCHAR());
@@ -86,6 +86,8 @@ sub load_by_public_id($$) {
     $id_builder->aes_key($row[3]);
     $id_builder->uid($row[4]);
     $id_builder->counter($row[5]);
+    $id_builder->created_at($row[6]);
+    $id_builder->updated_at($row[7]);
 
     return $id_builder->build;
 }
@@ -93,7 +95,7 @@ sub load_by_public_id($$) {
 sub load_by_username($$) {
     my ($self, $username) = @_;
 
-    my $query = 'SELECT public_id, serial_number, username, aes_key, uid, counter FROM identities WHERE username=?';
+    my $query = 'SELECT public_id, serial_number, username, aes_key, uid, counter, created_at, updated_at FROM identities WHERE username=?';
 
     my $sth = $self->{db}->prepare($query);
     $sth->bind_param(1, $username, DBI::SQL_VARCHAR());
@@ -109,6 +111,8 @@ sub load_by_username($$) {
     $id_builder->aes_key($row[3]);
     $id_builder->uid($row[4]);
     $id_builder->counter($row[5]);
+    $id_builder->created_at($row[6]);
+    $id_builder->updated_at($row[7]);
 
     return $id_builder->build;
 }
@@ -126,6 +130,30 @@ sub store_identity($$) {
     $sth->bind_param(6, $identity->counter(), DBI::SQL_INTEGER());
     $sth->execute()
         or croak(ref($self) . "->store_identity() unable to execute statement $query: " . $sth->errstr);
+}
+
+sub enumerate($) {
+    my ($self) = @_;
+
+    my $query = 'SELECT public_id, serial_number, username, aes_key, uid, counter, created_at, updated_at FROM identities ORDER BY username';
+
+    my $sth = $self->{db}->prepare($query);
+    $sth->execute()
+        or croak(ref($self) . "->enumerate() unable to execute statement $query: " . $sth->errstr);
+
+    return map {
+        my $id_builder = YubiAuthd::IdentityBuilder->new($self);
+        $id_builder->public_id($_->[0]);
+        $id_builder->serial_number($_->[1]);
+        $id_builder->username($_->[2]);
+        $id_builder->aes_key($_->[3]);
+        $id_builder->uid($_->[4]);
+        $id_builder->counter($_->[5]);
+        $id_builder->created_at($_->[6]);
+        $id_builder->updated_at($_->[7]);
+
+        $id_builder->build;
+    } @{$sth->fetchall_arrayref()};
 }
 
 sub notify($$) {

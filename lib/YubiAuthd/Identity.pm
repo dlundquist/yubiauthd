@@ -52,6 +52,8 @@ sub new($%) {
     my $aes_key         = $params{aes_key};
     my $uid             = $params{uid};
     my $counter         = $params{counter};
+    my $updated_at      = $params{updated_at};
+    my $created_at      = $params{created_at};
     my $identity_store  = $params{identity_store};
 
     # Untaint public_id
@@ -79,6 +81,8 @@ sub new($%) {
         aes_key         => $aes_key,
         uid             => $uid,
         counter         => int($counter),
+        updated_at      => $updated_at,
+        created_at      => $created_at,
         identity_store  => $identity_store,
     };
 
@@ -131,6 +135,18 @@ sub counter($) {
     }
 
     return $self->{'counter'};
+}
+
+sub updated_at($) {
+    my $self = shift;
+
+    return $self->{'updated_at'};
+}
+
+sub created_at($) {
+    my $self = shift;
+
+    return $self->{'created_at'};
 }
 
 sub identity_store($) {

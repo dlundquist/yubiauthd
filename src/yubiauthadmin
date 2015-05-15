@@ -44,10 +44,9 @@ sub load_config {
 
 sub usage {
     my $context = shift;
-    print STDERR "yubiauthadmin <action> <argumments>\n" .
+    print STDERR "yubiauthadmin <action> <arguments>\n" .
                  "Actions:\n" .
                  "\tlist - lists the yubiauth identities\n".
-                 "\tdisable\n" .
                  "\tadd\n";
 
     exit 1;
@@ -72,9 +71,9 @@ sub add_identity {
     my $store = shift;
     my $otp = shift;
 
-    my $id = YubiAuthd::IdentityBuilder->new($store);
+    usage('add') unless ($otp && $otp =~ m/([cbdefghijklnrtuv]{12})[cbdefghijklnrtuv]{32}/);
 
-    usage('add') unless ($otp =~ m/([cbdefghijklnrtuv]{12})[cbdefghijklnrtuv]{32}/);
+    my $id = YubiAuthd::IdentityBuilder->new($store);
     $id->public_id($1);
 
     print "Remove the YubiKey and reinsert it while holding the button, continue to\n" .
@@ -116,10 +115,26 @@ sub add_identity {
     print "Done\n";
 }
 
+sub list_identities {
+    my $store = shift;
+
+    print "Public ID     Username          Serial No.  Created     Updated\n" .
+          "============  ================  ==========  ==========  ==========\n";
+
+    foreach my $id ($store->enumerate) {
+        printf("%12s  %-19s %8d  %-11s %-11s\n",
+               $id->public_id,
+               $id->username,
+               $id->serial_number,
+               (split /\s+/, $id->created_at)[0],
+               (split /\s+/, $id->updated_at)[0]);
+
+    }
+}
+
 sub main {
     my $actions = {
         add => \&add_identity,
-        disable => \&disable_identity,
         list => \&list_identities,
     };
     my ($action, @args) = @ARGV;

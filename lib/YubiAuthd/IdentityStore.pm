@@ -79,6 +79,13 @@ sub load_by_username {
     die "This method must be overridden by $class or another subclass of " . __PACKAGE__;
 }
 
+sub enumerate {
+    my $self = shift;
+    my $class = ref $self;
+
+    die "This method must be overridden by $class or another subclass of " . __PACKAGE__;
+}
+
 sub subscribe($$) {
     my ($self, $subscriber) = @_;
 

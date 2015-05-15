@@ -71,6 +71,8 @@ sub build($) {
         aes_key         => $self->aes_key,
         uid             => $self->uid,
         counter         => $self->counter,
+        updated_at      => $self->updated_at,
+        created_at      => $self->created_at,
         identity_store  => $self->identity_store
     );
 }
@@ -127,6 +129,24 @@ sub counter {
     $self->{counter} = $counter if defined $counter;
 
     return $self->{counter};
+}
+
+sub created_at {
+    my $self = shift;
+    my $created_at = shift;
+
+    $self->{created_at} = $created_at if defined $created_at;
+
+    return $self->{created_at};
+}
+
+sub updated_at {
+    my $self = shift;
+    my $updated_at = shift;
+
+    $self->{updated_at} = $updated_at if defined $updated_at;
+
+    return $self->{updated_at};
 }
 
 sub identity_store {
