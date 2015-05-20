@@ -52,3 +52,6 @@ Ensure the `auth_socket` directory exists and is readable by all users.
 
 An example syncronization peer configuration is included in `etc/yubiauthd.conf`. If in a dual stack enviornment, note the difference in behaviour of listening IPv6 sockets.
 
+License
+-------
+yubiauthd is released under the Apache 2.0 license.
