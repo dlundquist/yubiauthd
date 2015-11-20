@@ -47,9 +47,4 @@ test -e /etc/yubiauthd.conf || \
 test -e /etc/yubiauth.conf || \
     install -m 644 etc/yubiauth.conf /etc/yubiauth.conf
 
-# OpenBSD 5.3 includes Perl 5.12 which does not have IO::Socket::IP so fall back to IO::Socket::INET
-perl -pi -e 's/IO::Socket::IP/IO::Socket::INET/g' \
-        ${PREFIX}/libdata/perl5/site_perl/YubiAuthd/SynchronizationPeer.pm \
-        ${PREFIX}/libdata/perl5/site_perl/YubiAuthd/SynchronizationSocket.pm
-
 echo "Start yubiauthd with: LD_PRELOAD=libpthread.so /usr/local/sbin/yubiauthd"
