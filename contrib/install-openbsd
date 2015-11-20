@@ -41,6 +41,8 @@ install src/yubiauthd \
         ${PREFIX}/sbin/yubiauthd
 install src/yubiauth \
         ${PREFIX}/bin/yubiauth
+install src/yubiauthadmin \
+        ${PREFIX}/sbin/yubiauthadmin
 # Do not overwrite existing configuration files
 test -e /etc/yubiauthd.conf || \
     install -m 600 etc/yubiauthd.conf /etc/yubiauthd.conf

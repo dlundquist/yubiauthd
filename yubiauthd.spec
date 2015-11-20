@@ -33,6 +33,7 @@ install -b -D -m 0644 etc/yubiauth.conf ${RPM_BUILD_ROOT}/%{_sysconfdir}/yubiaut
 install -b -D -m 0600 etc/yubiauthd.conf ${RPM_BUILD_ROOT}/%{_sysconfdir}/yubiauthd.conf
 install -b -D -m 0755 src/yubiauth ${RPM_BUILD_ROOT}/usr/bin/yubiauth
 install -b -D -m 0755 src/yubiauthd ${RPM_BUILD_ROOT}/usr/sbin/yubiauthd
+install -b -D -m 0755 src/yubiauthadmin ${RPM_BUILD_ROOT}/usr/sbin/yubiauthadmin
 for FILE in AuthenticationChallenge.pm \
         AuthenticationSession.pm \
         AuthenticationSocket.pm \
@@ -53,6 +54,7 @@ done
 %defattr(755,root,root)
 /usr/bin/yubiauth
 /usr/sbin/yubiauthd
+/usr/sbin/yubiauthadmin
 %defattr(644,root,root)
 %{perl_vendorlib}/YubiAuthd/AuthenticationChallenge.pm
 %{perl_vendorlib}/YubiAuthd/AuthenticationSession.pm
