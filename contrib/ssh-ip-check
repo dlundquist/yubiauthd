@@ -261,7 +261,7 @@ sub post_auth {
         }
         closelog();
         exec($cmd, @ARGV);
-        die("exec($cmd) failed: $!";
+        die("exec($cmd) failed: $!");
     }
 
     my $shell;
@@ -275,7 +275,7 @@ sub post_auth {
         print_motd();
         closelog();
         exec($shell,"-l");
-        die("exec($shell) failed: $!";
+        die("exec($shell) failed: $!");
     }
 
     # Make taint checking happy.  Blindly accept any commands the user typed.
@@ -285,7 +285,7 @@ sub post_auth {
 
     closelog();
     exec($shell,"-c",$cmd);
-    die("exec($shell -c $cmd) failed: $!";
+    die("exec($shell -c $cmd) failed: $!");
 }
 
 sub main {
